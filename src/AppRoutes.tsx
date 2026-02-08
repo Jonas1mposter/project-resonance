@@ -1,15 +1,21 @@
 import { Routes, Route } from 'react-router-dom';
 import { useAppData } from '@/hooks/useAppData';
 import { useTTS } from '@/hooks/useTTS';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import UsagePage from './pages/UsagePage';
 import TrainingPage from './pages/TrainingPage';
 import PhrasesPage from './pages/PhrasesPage';
 import SettingsPage from './pages/SettingsPage';
 import DataPage from './pages/DataPage';
+import WelcomePage from './pages/WelcomePage';
 import NotFound from './pages/NotFound';
 
+const ONBOARDING_KEY = 'resonance_onboarding_done';
+
 export default function AppRoutes() {
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [welcomeChecked, setWelcomeChecked] = useState(false);
+
   const {
     phrases,
     settings,
@@ -24,7 +30,21 @@ export default function AppRoutes() {
     exportData,
     importData,
     recognize,
+    isLoaded,
   } = useAppData();
+
+  useEffect(() => {
+    if (isLoaded) {
+      const done = localStorage.getItem(ONBOARDING_KEY);
+      setShowWelcome(!done);
+      setWelcomeChecked(true);
+    }
+  }, [isLoaded]);
+
+  const handleOnboardingComplete = () => {
+    localStorage.setItem(ONBOARDING_KEY, 'true');
+    setShowWelcome(false);
+  };
 
   const { speak, stop, isSpeaking } = useTTS(
     settings.ttsRate,
@@ -42,6 +62,12 @@ export default function AppRoutes() {
     () => phrases.reduce((sum, p) => sum + p.recordingCount, 0),
     [phrases]
   );
+
+  if (!welcomeChecked) return null;
+
+  if (showWelcome) {
+    return <WelcomePage onComplete={handleOnboardingComplete} />;
+  }
 
   return (
     <Routes>
