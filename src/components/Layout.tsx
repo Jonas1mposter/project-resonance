@@ -1,0 +1,105 @@
+import { ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Mic, BookOpen, List, Settings, Database } from 'lucide-react';
+
+interface LayoutProps {
+  children: ReactNode;
+}
+
+const tabs = [
+  { path: '/training', label: '训练', icon: Mic },
+  { path: '/', label: '使用', icon: BookOpen },
+  { path: '/phrases', label: '词表', icon: List },
+  { path: '/settings', label: '设置', icon: Settings },
+  { path: '/data', label: '数据', icon: Database },
+];
+
+export default function Layout({ children }: LayoutProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  return (
+    <div className="flex min-h-screen flex-col bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
+        <div className="container flex h-16 items-center justify-between px-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+              <Mic className="h-5 w-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold leading-tight text-foreground">共鸣</h1>
+              <p className="text-xs text-muted-foreground">Project Resonance</p>
+            </div>
+          </div>
+          <nav className="hidden md:flex items-center gap-1">
+            {tabs.map((tab) => {
+              const isActive = location.pathname === tab.path;
+              return (
+                <button
+                  key={tab.path}
+                  onClick={() => navigate(tab.path)}
+                  className={`relative flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'text-primary'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+                >
+                  <tab.icon className="h-4 w-4" />
+                  {tab.label}
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeTab"
+                      className="absolute inset-0 rounded-lg bg-primary/10"
+                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="container px-4 py-6"
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
+      </main>
+
+      {/* Mobile Bottom Nav */}
+      <nav className="sticky bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur-md md:hidden">
+        <div className="flex items-center justify-around py-2">
+          {tabs.map((tab) => {
+            const isActive = location.pathname === tab.path;
+            return (
+              <button
+                key={tab.path}
+                onClick={() => navigate(tab.path)}
+                className={`flex flex-col items-center gap-1 rounded-lg px-3 py-1.5 text-xs transition-colors ${
+                  isActive
+                    ? 'text-primary'
+                    : 'text-muted-foreground'
+                }`}
+              >
+                <tab.icon className={`h-5 w-5 ${isActive ? 'text-primary' : ''}`} />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+    </div>
+  );
+}
