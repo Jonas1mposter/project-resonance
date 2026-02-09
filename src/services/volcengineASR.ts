@@ -314,25 +314,51 @@ export class VolcengineASRClient {
   /**
    * Handle incoming server messages
    */
-  private handleMessage(data: ArrayBuffer): void {
+  private handleMessage(data: ArrayBuffer | Blob | string): void {
+    // If data is a string, it's not a binary protocol frame — ignore
+    if (typeof data === 'string') {
+      console.log('[ASR] Received text message (ignored):', data.slice(0, 100));
+      return;
+    }
+
+    // Handle Blob by converting to ArrayBuffer
+    if (data instanceof Blob) {
+      data.arrayBuffer().then((buf) => this.handleBinaryMessage(buf));
+      return;
+    }
+
+    this.handleBinaryMessage(data);
+  }
+
+  private handleBinaryMessage(data: ArrayBuffer): void {
     try {
+      // Need at least 8 bytes for header
+      if (data.byteLength < 8) {
+        console.warn('[ASR] Received too-short frame, length:', data.byteLength);
+        return;
+      }
+
       const response = parseServerResponse(data);
 
       if (response.messageType === SERVER_FULL_RESPONSE) {
         if (response.payload) {
-          const result = JSON.parse(response.payload);
-          console.log('[ASR] Server response:', result);
+          try {
+            const result = JSON.parse(response.payload);
+            console.log('[ASR] Server response:', result);
 
-          const text = result?.result?.text || result?.payload_msg?.result?.text || '';
-          const isDefinite = result?.result?.definite === true || 
-                             result?.payload_msg?.result?.definite === true;
-          const utterances = result?.result?.utterances || 
-                            result?.payload_msg?.result?.utterances || [];
+            const text = result?.result?.text || result?.payload_msg?.result?.text || '';
+            const isDefinite = result?.result?.definite === true || 
+                               result?.payload_msg?.result?.definite === true;
+            const utterances = result?.result?.utterances || 
+                              result?.payload_msg?.result?.utterances || [];
 
-          if (isDefinite) {
-            this.callbacks.onFinalResult(text, utterances);
-          } else {
-            this.callbacks.onPartialResult(text);
+            if (isDefinite) {
+              this.callbacks.onFinalResult(text, utterances);
+            } else {
+              this.callbacks.onPartialResult(text);
+            }
+          } catch (parseErr) {
+            console.warn('[ASR] Could not parse payload JSON:', parseErr);
           }
         }
       } else if (response.messageType === SERVER_ACK) {
@@ -340,6 +366,8 @@ export class VolcengineASRClient {
       } else if (response.messageType === SERVER_ERROR_RESPONSE) {
         console.error('[ASR] Server error:', response.payload);
         this.callbacks.onError(response.payload || '识别服务返回错误');
+      } else {
+        console.log('[ASR] Unknown message type:', response.messageType);
       }
     } catch (err) {
       console.error('[ASR] Failed to parse server message:', err);
