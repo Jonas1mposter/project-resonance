@@ -111,7 +111,7 @@ export default function TrainingPage({ phrases, onAddRecording, onDeleteRecordin
     [expandedId, isRecording, handleStopRecording, handleStartRecording, currentIndex, filteredPhrases]
   );
 
-  useKeyboardShortcuts(shortcuts);
+  useKeyboardShortcuts(shortcuts, 'high');
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">

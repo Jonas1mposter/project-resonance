@@ -22,11 +22,11 @@ const shortcutGroups = [
   {
     title: '导航',
     shortcuts: [
-      { keys: ['Alt', '1'], description: '训练页面' },
-      { keys: ['Alt', '2'], description: '使用页面' },
-      { keys: ['Alt', '3'], description: '词表页面' },
-      { keys: ['Alt', '4'], description: '设置页面' },
-      { keys: ['Alt', '5'], description: '数据页面' },
+      { keys: ['1'], description: '训练页面' },
+      { keys: ['2'], description: '使用页面' },
+      { keys: ['3'], description: '词表页面' },
+      { keys: ['4'], description: '设置页面' },
+      { keys: ['5'], description: '数据页面' },
     ],
   },
   {
@@ -60,20 +60,19 @@ export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const { isOpen: shortcutsOpen, toggle: toggleShortcuts, close: closeShortcuts } = useShortcutHelpPanel();
 
-  // Alt+number navigation shortcuts
+  // Plain number key navigation (normal priority, page shortcuts override via capture phase)
   const navShortcuts = useMemo(
     () =>
       tabs.map((tab) => ({
         key: tab.shortcutKey,
         label: tab.label,
         description: `导航到${tab.label}`,
-        modifier: 'alt' as const,
         handler: () => navigate(tab.path),
       })),
     [navigate]
   );
 
-  useKeyboardShortcuts(navShortcuts);
+  useKeyboardShortcuts(navShortcuts, 'normal');
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
