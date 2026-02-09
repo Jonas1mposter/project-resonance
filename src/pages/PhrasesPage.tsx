@@ -71,24 +71,26 @@ export default function PhrasesPage({
           <h2 id="phrases-heading" className="text-2xl font-bold text-foreground">词表管理</h2>
           <p className="mt-1 text-muted-foreground">共 {phrases.length} 条短语</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={onExport}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+            className="a11y-target inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+            aria-label="导出词表"
           >
-            <Download className="h-4 w-4" />
+            <Download className="h-4 w-4" aria-hidden="true" />
             导出
           </button>
-          <label className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer">
-            <Upload className="h-4 w-4" />
+          <label className="a11y-target inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer" tabIndex={0} role="button" aria-label="导入词表">
+            <Upload className="h-4 w-4" aria-hidden="true" />
             导入
-            <input type="file" accept=".json" onChange={handleImportFile} className="hidden" />
+            <input type="file" accept=".json" onChange={handleImportFile} className="hidden" aria-hidden="true" />
           </label>
           <button
             onClick={() => setShowAddForm(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            className="a11y-target inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            aria-label="新增短语"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4" aria-hidden="true" />
             新增
           </button>
         </div>
@@ -153,15 +155,17 @@ export default function PhrasesPage({
         </div>
       </div>
 
-      {/* Category chips */}
-      <div className="flex flex-wrap gap-2">
+      {/* Category chips — enlarged for motor accessibility */}
+      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="筛选分类">
         <button
           onClick={() => setSelectedCategory('全部')}
-          className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+          className={`a11y-target rounded-full px-4 py-2 text-sm font-medium transition-colors ${
             selectedCategory === '全部'
               ? 'bg-primary text-primary-foreground'
               : 'bg-muted text-muted-foreground hover:text-foreground'
           }`}
+          role="radio"
+          aria-checked={selectedCategory === '全部'}
         >
           全部 ({phrases.length})
         </button>
@@ -169,11 +173,13 @@ export default function PhrasesPage({
           <button
             key={c}
             onClick={() => setSelectedCategory(c)}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`a11y-target rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               selectedCategory === c
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-muted text-muted-foreground hover:text-foreground'
             }`}
+            role="radio"
+            aria-checked={selectedCategory === c}
           >
             {c} ({categoryCounts[c] || 0})
           </button>

@@ -1,6 +1,7 @@
 import { AppSettings, DEFAULT_SETTINGS } from '@/types';
 import { useTTS } from '@/hooks/useTTS';
 import AccessibilitySettings from '@/components/AccessibilitySettings';
+import AccessibleStepper from '@/components/AccessibleStepper';
 
 interface SettingsPageProps {
   settings: AppSettings;
@@ -15,73 +16,52 @@ export default function SettingsPage({ settings, onUpdate }: SettingsPageProps) 
   };
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
+    <section className="max-w-lg mx-auto space-y-6" aria-labelledby="settings-heading">
       <div>
-        <h2 className="text-2xl font-bold text-foreground">设置</h2>
+        <h2 id="settings-heading" className="text-2xl font-bold text-foreground">设置</h2>
         <p className="mt-1 text-muted-foreground">调整识别、语音与辅助功能参数</p>
       </div>
 
       {/* Accessibility Settings — prominent placement like Apple */}
       <AccessibilitySettings />
 
-      {/* Recognition Settings */}
+      {/* Recognition Settings — now uses AccessibleStepper instead of sliders */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-5">
         <h3 className="font-semibold text-foreground">识别参数</h3>
 
-        <div>
-          <div className="flex justify-between mb-1.5">
-            <label htmlFor="topK" className="text-sm text-foreground">Top-K 候选数</label>
-            <span className="text-sm text-muted-foreground" aria-live="polite">{settings.topK}</span>
-          </div>
-          <input
-            id="topK"
-            type="range"
-            min={1}
-            max={5}
-            value={settings.topK}
-            onChange={(e) => update('topK', Number(e.target.value))}
-            className="w-full accent-primary"
-            aria-label={`Top-K 候选数: ${settings.topK}`}
-          />
-        </div>
+        <AccessibleStepper
+          label="Top-K 候选数"
+          value={settings.topK}
+          min={1}
+          max={5}
+          step={1}
+          onChange={(v) => update('topK', v)}
+          id="topK"
+        />
 
-        <div>
-          <div className="flex justify-between mb-1.5">
-            <label htmlFor="absThreshold" className="text-sm text-foreground">置信度阈值</label>
-            <span className="text-sm text-muted-foreground" aria-live="polite">{settings.absThreshold.toFixed(2)}</span>
-          </div>
-          <input
-            id="absThreshold"
-            type="range"
-            min={0.1}
-            max={0.95}
-            step={0.05}
-            value={settings.absThreshold}
-            onChange={(e) => update('absThreshold', Number(e.target.value))}
-            className="w-full accent-primary"
-            aria-label={`置信度阈值: ${settings.absThreshold.toFixed(2)}`}
-          />
-        </div>
+        <AccessibleStepper
+          label="置信度阈值"
+          value={settings.absThreshold}
+          min={0.1}
+          max={0.95}
+          step={0.05}
+          onChange={(v) => update('absThreshold', v)}
+          format={(v) => v.toFixed(2)}
+          id="absThreshold"
+        />
 
-        <div>
-          <div className="flex justify-between mb-1.5">
-            <label htmlFor="maxTemplates" className="text-sm text-foreground">每条最大模板数</label>
-            <span className="text-sm text-muted-foreground" aria-live="polite">{settings.maxTemplatesPerPhrase}</span>
-          </div>
-          <input
-            id="maxTemplates"
-            type="range"
-            min={2}
-            max={20}
-            value={settings.maxTemplatesPerPhrase}
-            onChange={(e) => update('maxTemplatesPerPhrase', Number(e.target.value))}
-            className="w-full accent-primary"
-            aria-label={`每条最大模板数: ${settings.maxTemplatesPerPhrase}`}
-          />
-        </div>
+        <AccessibleStepper
+          label="每条最大模板数"
+          value={settings.maxTemplatesPerPhrase}
+          min={2}
+          max={20}
+          step={1}
+          onChange={(v) => update('maxTemplatesPerPhrase', v)}
+          id="maxTemplates"
+        />
       </div>
 
-      {/* TTS Settings */}
+      {/* TTS Settings — now uses AccessibleStepper */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-5">
         <h3 className="font-semibold text-foreground">语音合成 (TTS)</h3>
 
@@ -91,68 +71,47 @@ export default function SettingsPage({ settings, onUpdate }: SettingsPageProps) 
           </div>
         )}
 
-        <div>
-          <div className="flex justify-between mb-1.5">
-            <label htmlFor="ttsRate" className="text-sm text-foreground">语速</label>
-            <span className="text-sm text-muted-foreground" aria-live="polite">{settings.ttsRate.toFixed(1)}x</span>
-          </div>
-          <input
-            id="ttsRate"
-            type="range"
-            min={0.5}
-            max={2}
-            step={0.1}
-            value={settings.ttsRate}
-            onChange={(e) => update('ttsRate', Number(e.target.value))}
-            className="w-full accent-primary"
-            aria-label={`语速: ${settings.ttsRate.toFixed(1)}倍`}
-          />
-        </div>
+        <AccessibleStepper
+          label="语速"
+          value={settings.ttsRate}
+          min={0.5}
+          max={2}
+          step={0.1}
+          onChange={(v) => update('ttsRate', v)}
+          format={(v) => `${v.toFixed(1)}x`}
+          id="ttsRate"
+        />
 
-        <div>
-          <div className="flex justify-between mb-1.5">
-            <label htmlFor="ttsVolume" className="text-sm text-foreground">音量</label>
-            <span className="text-sm text-muted-foreground" aria-live="polite">{Math.round(settings.ttsVolume * 100)}%</span>
-          </div>
-          <input
-            id="ttsVolume"
-            type="range"
-            min={0}
-            max={1}
-            step={0.1}
-            value={settings.ttsVolume}
-            onChange={(e) => update('ttsVolume', Number(e.target.value))}
-            className="w-full accent-primary"
-            aria-label={`音量: ${Math.round(settings.ttsVolume * 100)}%`}
-          />
-        </div>
+        <AccessibleStepper
+          label="音量"
+          value={settings.ttsVolume}
+          min={0}
+          max={1}
+          step={0.1}
+          onChange={(v) => update('ttsVolume', v)}
+          format={(v) => `${Math.round(v * 100)}%`}
+          id="ttsVolume"
+        />
 
-        <div>
-          <div className="flex justify-between mb-1.5">
-            <label htmlFor="ttsPitch" className="text-sm text-foreground">音高</label>
-            <span className="text-sm text-muted-foreground" aria-live="polite">{settings.ttsPitch.toFixed(1)}</span>
-          </div>
-          <input
-            id="ttsPitch"
-            type="range"
-            min={0.5}
-            max={2}
-            step={0.1}
-            value={settings.ttsPitch}
-            onChange={(e) => update('ttsPitch', Number(e.target.value))}
-            className="w-full accent-primary"
-            aria-label={`音高: ${settings.ttsPitch.toFixed(1)}`}
-          />
-        </div>
+        <AccessibleStepper
+          label="音高"
+          value={settings.ttsPitch}
+          min={0.5}
+          max={2}
+          step={0.1}
+          onChange={(v) => update('ttsPitch', v)}
+          format={(v) => v.toFixed(1)}
+          id="ttsPitch"
+        />
 
         {voices.length > 0 && (
           <div>
-            <label htmlFor="ttsVoice" className="text-sm text-foreground block mb-1.5">语音</label>
+            <label htmlFor="ttsVoice" className="text-sm font-medium text-foreground block mb-1.5">语音</label>
             <select
               id="ttsVoice"
               value={settings.ttsVoice}
               onChange={(e) => update('ttsVoice', e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full rounded-lg border border-input bg-background px-3 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring a11y-target"
               aria-label="选择语音"
             >
               <option value="">自动选择</option>
@@ -176,6 +135,6 @@ export default function SettingsPage({ settings, onUpdate }: SettingsPageProps) 
       >
         恢复默认设置
       </button>
-    </div>
+    </section>
   );
 }

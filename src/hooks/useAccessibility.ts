@@ -11,6 +11,10 @@ export interface AccessibilitySettings {
   alwaysShowFocus: boolean;
   /** Large touch target mode: enlarges all interactive elements */
   largeTouchTargets: boolean;
+  /** Dwell-to-click: auto-activate on hover after delay (ms), 0 = off */
+  dwellTimeMs: number;
+  /** Click debounce delay (ms) to prevent accidental double-clicks */
+  clickDebounceMs: number;
 }
 
 export const DEFAULT_A11Y: AccessibilitySettings = {
@@ -19,6 +23,8 @@ export const DEFAULT_A11Y: AccessibilitySettings = {
   highContrast: 'system',
   alwaysShowFocus: false,
   largeTouchTargets: true, // on by default for cerebral palsy users
+  dwellTimeMs: 0, // off by default, user can enable
+  clickDebounceMs: 0, // off by default
 };
 
 const A11Y_KEY = 'resonance_a11y';

@@ -91,19 +91,21 @@ export default function DataPage({
             <p className="text-sm text-foreground mb-3">
               确定要清空所有训练数据吗？词表将保留，但所有录音将被删除。
             </p>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <button
                 onClick={() => {
                   onClearTraining();
                   setConfirmAction(null);
                 }}
-                className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:opacity-90"
+                className="a11y-target rounded-lg bg-destructive px-5 py-3 text-sm font-medium text-destructive-foreground hover:opacity-90"
+                aria-label="确认清空训练数据"
               >
                 确认清空
               </button>
               <button
                 onClick={() => setConfirmAction(null)}
-                className="rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+                className="a11y-target rounded-lg border border-border px-5 py-3 text-sm text-foreground hover:bg-muted"
+                aria-label="取消清空操作"
               >
                 取消
               </button>
@@ -112,9 +114,10 @@ export default function DataPage({
         ) : (
           <button
             onClick={() => setConfirmAction('training')}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-destructive/30 py-3 text-sm font-medium text-destructive hover:bg-destructive/5 transition-colors"
+            className="a11y-target flex w-full items-center justify-center gap-2 rounded-lg border border-destructive/30 py-3 text-sm font-medium text-destructive hover:bg-destructive/5 transition-colors"
+            aria-label="清空训练数据（保留词表）"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
             清空训练数据（保留词表）
           </button>
         )}
@@ -128,19 +131,21 @@ export default function DataPage({
             <p className="text-sm text-foreground mb-3">
               确定要清空全部数据吗？词表、录音和设置将全部重置为默认值。
             </p>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <button
                 onClick={() => {
                   onClearAll();
                   setConfirmAction(null);
                 }}
-                className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:opacity-90"
+                className="a11y-target rounded-lg bg-destructive px-5 py-3 text-sm font-medium text-destructive-foreground hover:opacity-90"
+                aria-label="确认清空全部数据"
               >
                 确认清空全部
               </button>
               <button
                 onClick={() => setConfirmAction(null)}
-                className="rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+                className="a11y-target rounded-lg border border-border px-5 py-3 text-sm text-foreground hover:bg-muted"
+                aria-label="取消清空操作"
               >
                 取消
               </button>
@@ -149,9 +154,10 @@ export default function DataPage({
         ) : (
           <button
             onClick={() => setConfirmAction('all')}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-destructive/30 py-3 text-sm font-medium text-destructive hover:bg-destructive/5 transition-colors"
+            className="a11y-target flex w-full items-center justify-center gap-2 rounded-lg border border-destructive/30 py-3 text-sm font-medium text-destructive hover:bg-destructive/5 transition-colors"
+            aria-label="清空全部数据"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
             清空全部数据
           </button>
         )}
