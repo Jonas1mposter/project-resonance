@@ -31,6 +31,7 @@ const Index = () => {
       onSpeak={speak}
       onStop={stop}
       isSpeaking={isSpeaking}
+      asrSettings={settings.asr}
     />
   );
 };
