@@ -1,26 +1,84 @@
-import { ReactNode } from 'react';
+import { ReactNode, useCallback, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, BookOpen, List, Settings, Database } from 'lucide-react';
+import { Mic, BookOpen, List, Settings, Database, Keyboard } from 'lucide-react';
+import SkipToContent from './SkipToContent';
+import KeyboardShortcutsPanel from './KeyboardShortcutsPanel';
+import { useKeyboardShortcuts, useShortcutHelpPanel } from '@/hooks/useKeyboardShortcuts';
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 const tabs = [
-  { path: '/training', label: '训练', icon: Mic },
-  { path: '/', label: '使用', icon: BookOpen },
-  { path: '/phrases', label: '词表', icon: List },
-  { path: '/settings', label: '设置', icon: Settings },
-  { path: '/data', label: '数据', icon: Database },
+  { path: '/training', label: '训练', icon: Mic, shortcutKey: '1' },
+  { path: '/', label: '使用', icon: BookOpen, shortcutKey: '2' },
+  { path: '/phrases', label: '词表', icon: List, shortcutKey: '3' },
+  { path: '/settings', label: '设置', icon: Settings, shortcutKey: '4' },
+  { path: '/data', label: '数据', icon: Database, shortcutKey: '5' },
+];
+
+const shortcutGroups = [
+  {
+    title: '导航',
+    shortcuts: [
+      { keys: ['Alt', '1'], description: '训练页面' },
+      { keys: ['Alt', '2'], description: '使用页面' },
+      { keys: ['Alt', '3'], description: '词表页面' },
+      { keys: ['Alt', '4'], description: '设置页面' },
+      { keys: ['Alt', '5'], description: '数据页面' },
+    ],
+  },
+  {
+    title: '录音操作',
+    shortcuts: [
+      { keys: ['空格'], description: '开始/停止录音' },
+      { keys: ['Esc'], description: '取消当前操作' },
+    ],
+  },
+  {
+    title: '识别结果',
+    shortcuts: [
+      { keys: ['1~3'], description: '选择对应候选结果' },
+      { keys: ['R'], description: '再说一次（重置）' },
+      { keys: ['T'], description: '复述选中短语 (TTS)' },
+      { keys: ['C'], description: '复制选中文本' },
+    ],
+  },
+  {
+    title: '通用',
+    shortcuts: [
+      { keys: ['?'], description: '显示/隐藏快捷键帮助' },
+      { keys: ['Tab'], description: '切换焦点' },
+      { keys: ['Enter'], description: '确认/激活' },
+    ],
+  },
 ];
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { isOpen: shortcutsOpen, toggle: toggleShortcuts, close: closeShortcuts } = useShortcutHelpPanel();
+
+  // Alt+number navigation shortcuts
+  const navShortcuts = useMemo(
+    () =>
+      tabs.map((tab) => ({
+        key: tab.shortcutKey,
+        label: tab.label,
+        description: `导航到${tab.label}`,
+        modifier: 'alt' as const,
+        handler: () => navigate(tab.path),
+      })),
+    [navigate]
+  );
+
+  useKeyboardShortcuts(navShortcuts);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      <SkipToContent />
+
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
         <div className="container flex h-16 items-center justify-between px-4">
@@ -33,37 +91,50 @@ export default function Layout({ children }: LayoutProps) {
               <p className="text-xs text-muted-foreground">Project Resonance</p>
             </div>
           </div>
-          <nav className="hidden md:flex items-center gap-1">
-            {tabs.map((tab) => {
-              const isActive = location.pathname === tab.path;
-              return (
-                <button
-                  key={tab.path}
-                  onClick={() => navigate(tab.path)}
-                  className={`relative flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'text-primary'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
-                >
-                  <tab.icon className="h-4 w-4" />
-                  {tab.label}
-                  {isActive && (
-                    <motion.div
-                      layoutId="activeTab"
-                      className="absolute inset-0 rounded-lg bg-primary/10"
-                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </nav>
+          <div className="hidden md:flex items-center gap-1">
+            <nav className="flex items-center gap-1" role="navigation" aria-label="主导航">
+              {tabs.map((tab) => {
+                const isActive = location.pathname === tab.path;
+                return (
+                  <button
+                    key={tab.path}
+                    onClick={() => navigate(tab.path)}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`a11y-target relative flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'text-primary'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <tab.icon className="h-4 w-4" />
+                    {tab.label}
+                    <span className="kbd-hint ml-1 hidden lg:inline-flex">{tab.shortcutKey}</span>
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeTab"
+                        className="absolute inset-0 rounded-lg bg-primary/10"
+                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+            {/* Keyboard help toggle */}
+            <button
+              onClick={toggleShortcuts}
+              className="a11y-target rounded-lg p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors ml-2"
+              aria-label="显示键盘快捷键帮助"
+              title="键盘快捷键 (?)"
+            >
+              <Keyboard className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1">
+      <main id="main-content" className="flex-1" role="main">
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
@@ -79,15 +150,20 @@ export default function Layout({ children }: LayoutProps) {
       </main>
 
       {/* Mobile Bottom Nav */}
-      <nav className="sticky bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur-md md:hidden">
-        <div className="flex items-center justify-around py-2">
+      <nav
+        className="sticky bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur-md md:hidden"
+        role="navigation"
+        aria-label="移动端导航"
+      >
+        <div className="flex items-center justify-around py-1">
           {tabs.map((tab) => {
             const isActive = location.pathname === tab.path;
             return (
               <button
                 key={tab.path}
                 onClick={() => navigate(tab.path)}
-                className={`flex flex-col items-center gap-1 rounded-lg px-3 py-1.5 text-xs transition-colors ${
+                aria-current={isActive ? 'page' : undefined}
+                className={`a11y-target flex flex-col items-center gap-1 rounded-lg px-3 py-1.5 text-xs transition-colors ${
                   isActive
                     ? 'text-primary'
                     : 'text-muted-foreground'
@@ -100,6 +176,13 @@ export default function Layout({ children }: LayoutProps) {
           })}
         </div>
       </nav>
+
+      {/* Keyboard Shortcuts Help Panel */}
+      <KeyboardShortcutsPanel
+        isOpen={shortcutsOpen}
+        onClose={closeShortcuts}
+        groups={shortcutGroups}
+      />
     </div>
   );
 }

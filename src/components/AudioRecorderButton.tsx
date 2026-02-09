@@ -24,14 +24,17 @@ export default function AudioRecorderButton({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const buttonSize = size === 'lg' ? 'h-20 w-20' : 'h-14 w-14';
-  const iconSize = size === 'lg' ? 'h-8 w-8' : 'h-5 w-5';
+  // Larger targets for a11y: lg=96px, sm=64px
+  const buttonSize = size === 'lg' ? 'h-24 w-24' : 'h-16 w-16';
+  const iconSize = size === 'lg' ? 'h-10 w-10' : 'h-6 w-6';
 
   return (
     <div className="flex flex-col items-center gap-3">
       <motion.button
         onClick={isRecording ? onStop : onStart}
         whileTap={{ scale: 0.92 }}
+        aria-label={isRecording ? '停止录音' : '开始录音'}
+        aria-pressed={isRecording}
         className={`relative flex items-center justify-center rounded-full transition-all ${buttonSize} ${
           isRecording
             ? 'bg-recording text-recording-foreground recording-pulse'
@@ -53,13 +56,23 @@ export default function AudioRecorderButton({
       </motion.button>
 
       {isRecording ? (
-        <div className="flex items-center gap-2 text-sm font-medium text-recording">
+        <div className="flex items-center gap-2 text-sm font-medium text-recording" role="status" aria-live="polite">
           <span className="h-2 w-2 rounded-full bg-recording animate-pulse" />
           录音中 {formatDuration(duration)}
+          <kbd className="kbd-hint ml-1">空格</kbd>
+          <span className="text-xs text-muted-foreground">停止</span>
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">
-          {size === 'lg' ? '点击开始录音' : '录音'}
+          {size === 'lg' ? (
+            <span className="flex items-center gap-2">
+              点击或按
+              <kbd className="kbd-hint">空格</kbd>
+              开始录音
+            </span>
+          ) : (
+            '录音'
+          )}
         </p>
       )}
     </div>

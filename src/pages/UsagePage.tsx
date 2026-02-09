@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Mic, RotateCcw } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import AudioRecorderButton from '@/components/AudioRecorderButton';
 import RecognitionResult from '@/components/RecognitionResult';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { toast } from 'sonner';
 
 interface UsagePageProps {
@@ -36,6 +37,7 @@ export default function UsagePage({
   const [isUnknown, setIsUnknown] = useState(false);
   const [lastBlob, setLastBlob] = useState<Blob | null>(null);
   const [lastDuration, setLastDuration] = useState(0);
+  const [selectedText, setSelectedText] = useState<string | null>(null);
 
   const handleStart = useCallback(async () => {
     setRecognitionState('recording');
@@ -65,10 +67,12 @@ export default function UsagePage({
     (phraseId: string) => {
       if (lastBlob) {
         onFeedback(phraseId, lastBlob, lastDuration);
+        const phrase = results.find((r) => r.phraseId === phraseId);
+        if (phrase) setSelectedText(phrase.text);
         toast.success('已回灌至训练数据，下次识别更准确');
       }
     },
-    [lastBlob, lastDuration, onFeedback]
+    [lastBlob, lastDuration, onFeedback, results]
   );
 
   const handleCopy = useCallback((text: string) => {
@@ -82,7 +86,92 @@ export default function UsagePage({
     setResults([]);
     setIsUnknown(false);
     setLastBlob(null);
+    setSelectedText(null);
   }, []);
+
+  // Keyboard shortcuts
+  const shortcuts = useMemo(
+    () => [
+      {
+        key: ' ',
+        label: '录音',
+        description: '开始/停止录音',
+        handler: () => {
+          if (recognitionState === 'idle') handleStart();
+          else if (recognitionState === 'recording') handleStop();
+        },
+        enabled: recognitionState === 'idle' || recognitionState === 'recording',
+      },
+      {
+        key: 'r',
+        label: '重置',
+        description: '再说一次',
+        handler: handleReset,
+        enabled: recognitionState === 'result',
+      },
+      {
+        key: 't',
+        label: '复述',
+        description: '语音复述',
+        handler: () => {
+          if (selectedText) {
+            isSpeaking ? onStop() : onSpeak(selectedText);
+          }
+        },
+        enabled: recognitionState === 'result' && !!selectedText,
+      },
+      {
+        key: 'c',
+        label: '复制',
+        description: '复制文本',
+        handler: () => {
+          if (selectedText) handleCopy(selectedText);
+        },
+        enabled: recognitionState === 'result' && !!selectedText,
+      },
+      {
+        key: 'Escape',
+        label: '取消',
+        description: '取消录音',
+        handler: () => {
+          if (recognitionState === 'recording') {
+            stopRecording();
+            setRecognitionState('idle');
+          }
+        },
+        enabled: recognitionState === 'recording',
+      },
+      // Number keys 1-3 to select results
+      ...([1, 2, 3] as const).map((num) => ({
+        key: String(num),
+        label: `选择 ${num}`,
+        description: `选择第 ${num} 个候选`,
+        handler: () => {
+          if (results[num - 1]) {
+            handleSelect(results[num - 1].phraseId);
+          }
+        },
+        enabled: recognitionState === 'result' && !isUnknown && results.length >= num && !selectedText,
+      })),
+    ],
+    [
+      recognitionState,
+      handleStart,
+      handleStop,
+      handleReset,
+      handleSelect,
+      handleCopy,
+      selectedText,
+      isSpeaking,
+      onSpeak,
+      onStop,
+      stopRecording,
+      results,
+      isUnknown,
+    ]
+  );
+
+  useKeyboardShortcuts(shortcuts);
 
   if (trainedCount === 0) {
     return (
@@ -112,6 +201,15 @@ export default function UsagePage({
           已有 {trainedCount} 条短语可识别
         </p>
       </div>
+
+      {/* Keyboard hint */}
+      {recognitionState === 'idle' && (
+        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+          <span>按</span>
+          <kbd className="kbd-hint">空格</kbd>
+          <span>开始录音</span>
+        </div>
+      )}
 
       {/* Recording Area */}
       {(recognitionState === 'idle' || recognitionState === 'recording') && (
@@ -159,16 +257,17 @@ export default function UsagePage({
           />
           <button
             onClick={handleReset}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+            className="a11y-target flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 text-sm font-medium text-foreground hover:bg-muted transition-colors"
           >
             <RotateCcw className="h-4 w-4" />
             再说一次
+            <kbd className="kbd-hint ml-2">R</kbd>
           </button>
         </>
       )}
 
       {error && (
-        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive" role="alert">
           {error}
         </div>
       )}

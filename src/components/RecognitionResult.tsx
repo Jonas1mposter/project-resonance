@@ -30,6 +30,7 @@ export default function RecognitionResult({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         className="rounded-xl border border-border bg-card p-6 text-center"
+        role="alert"
       >
         <HelpCircle className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
         <h3 className="text-lg font-semibold text-foreground">没听懂</h3>
@@ -48,6 +49,8 @@ export default function RecognitionResult({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="rounded-xl border-2 border-success bg-card p-6"
+          role="status"
+          aria-live="polite"
         >
           <div className="flex items-center gap-2 mb-4">
             <div className="flex h-6 w-6 items-center justify-center rounded-full bg-success">
@@ -62,12 +65,14 @@ export default function RecognitionResult({
               onSpeak={onSpeak}
               onStop={onStop}
               isSpeaking={isSpeaking}
+              shortcutHint="T"
             />
             <button
               onClick={() => onCopy(selected.text)}
-              className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+              className="a11y-target inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
             >
               复制文本
+              <kbd className="kbd-hint">C</kbd>
             </button>
           </div>
         </motion.div>
@@ -76,9 +81,9 @@ export default function RecognitionResult({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" role="listbox" aria-label="识别结果">
       <h3 className="text-sm font-medium text-muted-foreground">
-        识别结果 — 请选择正确的短语：
+        识别结果 — 请选择正确的短语（按数字键快速选择）：
       </h3>
       {results.map((result, index) => (
         <motion.button
@@ -90,17 +95,22 @@ export default function RecognitionResult({
             setSelectedId(result.phraseId);
             onSelect(result.phraseId);
           }}
-          className="flex w-full items-center justify-between rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary hover:shadow-sm"
+          role="option"
+          aria-selected={selectedId === result.phraseId}
+          className="a11y-target flex w-full items-center justify-between rounded-xl border border-border bg-card p-4 text-left transition-all hover:border-primary hover:shadow-sm"
         >
           <div className="flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-sm font-bold text-muted-foreground">
               {index + 1}
             </span>
             <span className="text-lg font-medium text-foreground">{result.text}</span>
           </div>
-          <span className="text-sm text-muted-foreground">
-            {Math.round(result.confidence * 100)}%
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              {Math.round(result.confidence * 100)}%
+            </span>
+            {index < 3 && <kbd className="kbd-hint">{index + 1}</kbd>}
+          </div>
         </motion.button>
       ))}
     </div>
