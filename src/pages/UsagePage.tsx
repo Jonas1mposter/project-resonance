@@ -46,12 +46,25 @@ export default function UsagePage({
   const [selectedText, setSelectedText] = useState<string | null>(null);
 
   // ASR hook
+  // Build proxy URL automatically using the Edge Function
+  const proxyWsUrl = useMemo(() => {
+    if (asrSettings.proxyUrl) return asrSettings.proxyUrl;
+    // Auto-construct from Supabase project URL
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    if (supabaseUrl) {
+      const wsUrl = supabaseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
+      const resourceId = asrSettings.resourceId || 'volc.bigasr.sauc.duration';
+      return `${wsUrl}/functions/v1/asr-proxy?resource_id=${encodeURIComponent(resourceId)}`;
+    }
+    return undefined;
+  }, [asrSettings.proxyUrl, asrSettings.resourceId]);
+
   const asrConfig = useMemo(() => ({
     appKey: asrSettings.appKey,
     accessKey: asrSettings.accessKey,
     resourceId: asrSettings.resourceId,
-    proxyUrl: asrSettings.proxyUrl || undefined,
-  }), [asrSettings.appKey, asrSettings.accessKey, asrSettings.resourceId, asrSettings.proxyUrl]);
+    proxyUrl: proxyWsUrl,
+  }), [asrSettings.appKey, asrSettings.accessKey, asrSettings.resourceId, proxyWsUrl]);
 
   const {
     state: asrState,
