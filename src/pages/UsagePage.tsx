@@ -171,7 +171,7 @@ export default function UsagePage({
     ]
   );
 
-  useKeyboardShortcuts(shortcuts);
+  useKeyboardShortcuts(shortcuts, 'high');
 
   if (trainedCount === 0) {
     return (

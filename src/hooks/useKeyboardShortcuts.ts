@@ -10,12 +10,19 @@ export interface ShortcutAction {
 }
 
 /**
- * Global keyboard shortcuts hook for accessibility.
+ * Keyboard shortcuts hook for accessibility.
  * Designed for users with cerebral palsy who cannot reliably control a mouse.
+ * 
+ * @param actions - Array of shortcut actions to register
+ * @param priority - 'high' uses capture phase (fires first), 'normal' uses bubble phase.
+ *   Page-specific shortcuts should use 'high' to override global navigation.
  */
-export function useKeyboardShortcuts(actions: ShortcutAction[]) {
+export function useKeyboardShortcuts(actions: ShortcutAction[], priority: 'high' | 'normal' = 'normal') {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Skip if already consumed by a higher-priority handler
+      if ((e as any).__shortcutConsumed) return;
+
       // Don't trigger when typing in inputs
       const target = e.target as HTMLElement;
       if (
@@ -45,15 +52,18 @@ export function useKeyboardShortcuts(actions: ShortcutAction[]) {
 
         if (keyMatch && modifierMatch && noUnwantedModifier) {
           e.preventDefault();
+          (e as any).__shortcutConsumed = true;
           action.handler();
           return;
         }
       }
     };
 
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [actions]);
+    // High priority uses capture phase (fires before bubble)
+    const useCapture = priority === 'high';
+    window.addEventListener('keydown', handler, useCapture);
+    return () => window.removeEventListener('keydown', handler, useCapture);
+  }, [actions, priority]);
 }
 
 /**
