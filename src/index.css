@@ -260,4 +260,26 @@
       scroll-behavior: smooth;
     }
   }
+
+  /* ===== Dwell Control visual feedback ===== */
+  .dwell-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    width: 0%;
+    border-radius: 0 0 var(--radius) var(--radius);
+    background: hsl(var(--primary));
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* ===== Motor accessibility: pointer precision ===== */
+  /* Increase spacing between interactive elements for imprecise pointers */
+  @media (pointer: coarse) {
+    .a11y-target {
+      min-width: 56px;
+      min-height: 56px;
+    }
+  }
 }
