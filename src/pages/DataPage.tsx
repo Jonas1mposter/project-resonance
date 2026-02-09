@@ -34,20 +34,20 @@ export default function DataPage({
   };
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
+    <section className="max-w-lg mx-auto space-y-6" aria-labelledby="data-heading">
       <div>
-        <h2 className="text-2xl font-bold text-foreground">数据管理</h2>
+        <h2 id="data-heading" className="text-2xl font-bold text-foreground">数据管理</h2>
         <p className="mt-1 text-muted-foreground">导入导出和管理本地数据</p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4" role="group" aria-label="数据统计">
         <div className="rounded-xl border border-border bg-card p-4 text-center">
-          <p className="text-3xl font-bold text-primary">{phraseCount}</p>
+          <p className="text-3xl font-bold text-primary" aria-label={`${phraseCount} 条词表条目`}>{phraseCount}</p>
           <p className="text-sm text-muted-foreground mt-1">词表条目</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4 text-center">
-          <p className="text-3xl font-bold text-primary">{recordingCount}</p>
+          <p className="text-3xl font-bold text-primary" aria-label={`${recordingCount} 个录音样本`}>{recordingCount}</p>
           <p className="text-sm text-muted-foreground mt-1">录音样本</p>
         </div>
       </div>
@@ -58,15 +58,16 @@ export default function DataPage({
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={onExport}
-            className="flex items-center justify-center gap-2 rounded-lg border border-border py-3 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+            className="a11y-target flex items-center justify-center gap-2 rounded-lg border border-border py-3 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+            aria-label="导出词表为JSON文件"
           >
-            <Download className="h-4 w-4" />
+            <Download className="h-4 w-4" aria-hidden="true" />
             导出词表
           </button>
-          <label className="flex items-center justify-center gap-2 rounded-lg border border-border py-3 text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer">
-            <Upload className="h-4 w-4" />
+          <label className="a11y-target flex items-center justify-center gap-2 rounded-lg border border-border py-3 text-sm font-medium text-foreground hover:bg-muted transition-colors cursor-pointer" tabIndex={0} role="button" aria-label="导入词表JSON文件">
+            <Upload className="h-4 w-4" aria-hidden="true" />
             导入词表
-            <input type="file" accept=".json" onChange={handleImportFile} className="hidden" />
+            <input type="file" accept=".json" onChange={handleImportFile} className="hidden" aria-hidden="true" />
           </label>
         </div>
         <p className="text-xs text-muted-foreground">
@@ -164,6 +165,6 @@ export default function DataPage({
           清除浏览器数据会导致训练数据丢失，建议定期导出备份。
         </p>
       </div>
-    </div>
+    </section>
   );
 }

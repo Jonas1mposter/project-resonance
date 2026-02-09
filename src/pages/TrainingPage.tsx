@@ -5,6 +5,7 @@ import { Phrase } from '@/types';
 import { CATEGORIES } from '@/types';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useAccessibility } from '@/hooks/useAccessibility';
 import AudioRecorderButton from '@/components/AudioRecorderButton';
 
 interface TrainingPageProps {
@@ -113,11 +114,13 @@ export default function TrainingPage({ phrases, onAddRecording, onDeleteRecordin
 
   useKeyboardShortcuts(shortcuts, 'high');
 
+  const { isMotionReduced } = useAccessibility();
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <section className="max-w-2xl mx-auto space-y-6" aria-labelledby="training-heading">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-foreground">训练录音</h2>
+        <h2 id="training-heading" className="text-2xl font-bold text-foreground">训练录音</h2>
         <p className="mt-1 text-muted-foreground">
           为每条短语录制至少 2 遍语音样本 · 按
           <kbd className="kbd-hint mx-1">↑↓</kbd>
@@ -185,13 +188,14 @@ export default function TrainingPage({ phrases, onAddRecording, onDeleteRecordin
           return (
             <motion.div
               key={phrase.id}
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: Math.min(index * 0.02, 0.5) }}
+              initial={isMotionReduced ? {} : { opacity: 0, y: 5 }}
+              animate={isMotionReduced ? {} : { opacity: 1, y: 0 }}
+              transition={isMotionReduced ? { duration: 0 } : { delay: Math.min(index * 0.02, 0.5) }}
               className={`rounded-xl border bg-card overflow-hidden transition-colors ${
                 isCurrentlyRecording ? 'border-recording' : isExpanded ? 'border-primary/50' : 'border-border'
               }`}
               role="listitem"
+              aria-label={`${phrase.text}，${isTrainedEnough ? '已达标' : `已录${phrase.recordingCount}次`}`}
             >
               <button
                 onClick={() => setExpandedId(isExpanded ? null : phrase.id)}
@@ -299,6 +303,6 @@ export default function TrainingPage({ phrases, onAddRecording, onDeleteRecordin
           <p>没有找到匹配的短语</p>
         </div>
       )}
-    </div>
+    </section>
   );
 }
