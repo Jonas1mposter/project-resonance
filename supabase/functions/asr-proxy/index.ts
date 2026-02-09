@@ -80,17 +80,19 @@ Deno.serve((req) => {
       pendingQueue.length = 0;
     });
 
-    upstream.on("message", (data: ArrayBuffer | Uint8Array) => {
+    upstream.on("message", (data: Buffer | ArrayBuffer | Uint8Array) => {
       try {
         if (clientWs.readyState === WebSocket.OPEN) {
-          const buf =
-            data instanceof ArrayBuffer
-              ? data
-              : (data as Uint8Array).buffer.slice(
-                  (data as Uint8Array).byteOffset,
-                  (data as Uint8Array).byteOffset + (data as Uint8Array).byteLength,
-                );
-          clientWs.send(buf);
+          // Always create a clean Uint8Array copy to avoid Buffer offset issues
+          let bytes: Uint8Array;
+          if (data instanceof ArrayBuffer) {
+            bytes = new Uint8Array(data);
+          } else {
+            // Buffer or Uint8Array - slice to exact bounds
+            bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+          }
+          // Send as a fresh copy to avoid shared buffer issues
+          clientWs.send(new Uint8Array(bytes).buffer);
         }
       } catch (e) {
         console.error("[asr-proxy] Error relaying upstream→client:", e);
