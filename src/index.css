@@ -137,4 +137,32 @@
     transform: translateY(-2px);
     box-shadow: 0 8px 25px -8px hsl(var(--foreground) / 0.1);
   }
+
+  /* ===== Accessibility: Enhanced Focus Styles ===== */
+  /* High-contrast focus ring for keyboard navigation */
+  *:focus-visible {
+    outline: 3px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius);
+  }
+
+  /* Minimum 48x48 touch/click target for a11y */
+  .a11y-target {
+    min-width: 48px;
+    min-height: 48px;
+    @apply flex items-center justify-center;
+  }
+
+  /* Large a11y target for primary actions (56x56) */
+  .a11y-target-lg {
+    min-width: 56px;
+    min-height: 56px;
+    @apply flex items-center justify-center;
+  }
+
+  /* Keyboard shortcut badge */
+  .kbd-hint {
+    @apply inline-flex items-center justify-center rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono font-semibold text-muted-foreground leading-none;
+    min-width: 1.25rem;
+  }
 }
