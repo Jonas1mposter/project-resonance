@@ -81,6 +81,7 @@ export default function AppRoutes() {
             onSpeak={speak}
             onStop={stop}
             isSpeaking={isSpeaking}
+            asrSettings={settings.asr}
           />
         }
       />

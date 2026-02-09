@@ -1,7 +1,8 @@
-import { AppSettings, DEFAULT_SETTINGS } from '@/types';
+import { AppSettings, ASRSettings, DEFAULT_SETTINGS } from '@/types';
 import { useTTS } from '@/hooks/useTTS';
 import AccessibilitySettings from '@/components/AccessibilitySettings';
 import AccessibleStepper from '@/components/AccessibleStepper';
+import ASRSettingsPanel from '@/components/ASRSettingsPanel';
 
 interface SettingsPageProps {
   settings: AppSettings;
@@ -24,6 +25,12 @@ export default function SettingsPage({ settings, onUpdate }: SettingsPageProps) 
 
       {/* Accessibility Settings — prominent placement like Apple */}
       <AccessibilitySettings />
+
+      {/* ASR Settings */}
+      <ASRSettingsPanel
+        settings={settings.asr}
+        onUpdate={(asr: ASRSettings) => onUpdate({ ...settings, asr })}
+      />
 
       {/* Recognition Settings — now uses AccessibleStepper instead of sliders */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-5">

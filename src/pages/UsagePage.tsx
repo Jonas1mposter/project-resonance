@@ -2,11 +2,14 @@ import { useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Mic, RotateCcw } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { useVolcengineASR } from '@/hooks/useVolcengineASR';
 import AudioRecorderButton from '@/components/AudioRecorderButton';
+import ASRStreamingResult from '@/components/ASRStreamingResult';
 import RecognitionResult from '@/components/RecognitionResult';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAccessibility } from '@/hooks/useAccessibility';
 import { toast } from 'sonner';
+import type { ASRSettings } from '@/types';
 
 interface UsagePageProps {
   recognize: () => {
@@ -18,6 +21,7 @@ interface UsagePageProps {
   onSpeak: (text: string) => void;
   onStop: () => void;
   isSpeaking: boolean;
+  asrSettings: ASRSettings;
 }
 
 export default function UsagePage({
@@ -27,8 +31,9 @@ export default function UsagePage({
   onSpeak,
   onStop,
   isSpeaking,
+  asrSettings,
 }: UsagePageProps) {
-  const { isRecording, duration, startRecording, stopRecording, error, audioLevel } = useAudioRecorder();
+  const { isRecording, duration, startRecording, stopRecording, error: recError, audioLevel } = useAudioRecorder();
   const [recognitionState, setRecognitionState] = useState<
     'idle' | 'recording' | 'processing' | 'result'
   >('idle');
@@ -40,29 +45,69 @@ export default function UsagePage({
   const [lastDuration, setLastDuration] = useState(0);
   const [selectedText, setSelectedText] = useState<string | null>(null);
 
+  // ASR hook
+  const asrConfig = useMemo(() => ({
+    appKey: asrSettings.appKey,
+    accessKey: asrSettings.accessKey,
+    resourceId: asrSettings.resourceId,
+    proxyUrl: asrSettings.proxyUrl || undefined,
+  }), [asrSettings.appKey, asrSettings.accessKey, asrSettings.resourceId, asrSettings.proxyUrl]);
+
+  const {
+    state: asrState,
+    partialText,
+    finalText,
+    error: asrError,
+    startSession,
+    stopSession,
+    reset: resetASR,
+    isRecognizing,
+  } = useVolcengineASR({
+    config: asrConfig,
+    mockMode: asrSettings.mockMode,
+  });
+
+  // Determine which mode to use: ASR mode (when ASR settings available) or legacy mode
+  const useASRMode = true; // Always use ASR mode now
+
   const handleStart = useCallback(async () => {
-    setRecognitionState('recording');
-    await startRecording();
-  }, [startRecording]);
+    if (useASRMode) {
+      setRecognitionState('recording');
+      await startRecording();
+      await startSession();
+    } else {
+      setRecognitionState('recording');
+      await startRecording();
+    }
+  }, [useASRMode, startRecording, startSession]);
 
   const handleStop = useCallback(async () => {
-    const result = await stopRecording();
-    if (result) {
-      setLastBlob(result.blob);
-      setLastDuration(result.duration);
-      setRecognitionState('processing');
-
-      // Simulate processing delay
-      setTimeout(() => {
-        const recognition = recognize();
-        setResults(recognition.results);
-        setIsUnknown(recognition.isUnknown);
-        setRecognitionState('result');
-      }, 600);
+    if (useASRMode) {
+      const result = await stopRecording();
+      if (result) {
+        setLastBlob(result.blob);
+        setLastDuration(result.duration);
+      }
+      stopSession();
+      setRecognitionState('result');
     } else {
-      setRecognitionState('idle');
+      const result = await stopRecording();
+      if (result) {
+        setLastBlob(result.blob);
+        setLastDuration(result.duration);
+        setRecognitionState('processing');
+
+        setTimeout(() => {
+          const recognition = recognize();
+          setResults(recognition.results);
+          setIsUnknown(recognition.isUnknown);
+          setRecognitionState('result');
+        }, 600);
+      } else {
+        setRecognitionState('idle');
+      }
     }
-  }, [stopRecording, recognize]);
+  }, [useASRMode, stopRecording, stopSession, recognize]);
 
   const handleSelect = useCallback(
     (phraseId: string) => {
@@ -88,7 +133,8 @@ export default function UsagePage({
     setIsUnknown(false);
     setLastBlob(null);
     setSelectedText(null);
-  }, []);
+    resetASR();
+  }, [resetASR]);
 
   // Keyboard shortcuts
   const shortcuts = useMemo(
@@ -115,20 +161,22 @@ export default function UsagePage({
         label: '复述',
         description: '语音复述',
         handler: () => {
-          if (selectedText) {
-            isSpeaking ? onStop() : onSpeak(selectedText);
+          const text = useASRMode ? finalText : selectedText;
+          if (text) {
+            isSpeaking ? onStop() : onSpeak(text);
           }
         },
-        enabled: recognitionState === 'result' && !!selectedText,
+        enabled: recognitionState === 'result' && !!(useASRMode ? finalText : selectedText),
       },
       {
         key: 'c',
         label: '复制',
         description: '复制文本',
         handler: () => {
-          if (selectedText) handleCopy(selectedText);
+          const text = useASRMode ? finalText : selectedText;
+          if (text) handleCopy(text);
         },
-        enabled: recognitionState === 'result' && !!selectedText,
+        enabled: recognitionState === 'result' && !!(useASRMode ? finalText : selectedText),
       },
       {
         key: 'Escape',
@@ -137,23 +185,26 @@ export default function UsagePage({
         handler: () => {
           if (recognitionState === 'recording') {
             stopRecording();
+            if (useASRMode) resetASR();
             setRecognitionState('idle');
           }
         },
         enabled: recognitionState === 'recording',
       },
-      // Number keys 1-3 to select results
-      ...([1, 2, 3] as const).map((num) => ({
-        key: String(num),
-        label: `选择 ${num}`,
-        description: `选择第 ${num} 个候选`,
-        handler: () => {
-          if (results[num - 1]) {
-            handleSelect(results[num - 1].phraseId);
-          }
-        },
-        enabled: recognitionState === 'result' && !isUnknown && results.length >= num && !selectedText,
-      })),
+      // Number keys 1-3 to select results (legacy mode only)
+      ...(!useASRMode
+        ? ([1, 2, 3] as const).map((num) => ({
+            key: String(num),
+            label: `选择 ${num}`,
+            description: `选择第 ${num} 个候选`,
+            handler: () => {
+              if (results[num - 1]) {
+                handleSelect(results[num - 1].phraseId);
+              }
+            },
+            enabled: recognitionState === 'result' && !isUnknown && results.length >= num && !selectedText,
+          }))
+        : []),
     ],
     [
       recognitionState,
@@ -163,19 +214,22 @@ export default function UsagePage({
       handleSelect,
       handleCopy,
       selectedText,
+      finalText,
       isSpeaking,
       onSpeak,
       onStop,
       stopRecording,
+      resetASR,
       results,
       isUnknown,
+      useASRMode,
     ]
   );
 
   useKeyboardShortcuts(shortcuts, 'high');
   const { isMotionReduced } = useAccessibility();
 
-  if (trainedCount === 0) {
+  if (trainedCount === 0 && !useASRMode) {
     return (
       <section className="max-w-lg mx-auto py-16 text-center" aria-labelledby="usage-empty-heading">
         <motion.div
@@ -200,7 +254,20 @@ export default function UsagePage({
       <div>
         <h2 id="usage-heading" className="text-2xl font-bold text-foreground">语音识别</h2>
         <p className="mt-1 text-muted-foreground">
-          已有 {trainedCount} 条短语可识别
+          {useASRMode ? (
+            <>
+              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium mr-2 ${
+                asrSettings.mockMode 
+                  ? 'bg-warning/15 text-warning-foreground' 
+                  : 'bg-success/15 text-success'
+              }`}>
+                {asrSettings.mockMode ? '模拟' : 'ASR'}
+              </span>
+              豆包大模型语音识别
+            </>
+          ) : (
+            <>已有 {trainedCount} 条短语可识别</>
+          )}
         </p>
       </div>
 
@@ -230,11 +297,24 @@ export default function UsagePage({
               size="lg"
             />
           </div>
+
+          {/* Show streaming partial text while recording */}
+          {useASRMode && isRecognizing && partialText && (
+            <div className="mt-6 pt-4 border-t border-border">
+              <ASRStreamingResult
+                partialText={partialText}
+                finalText=""
+                onSpeak={onSpeak}
+                onStop={onStop}
+                isSpeaking={isSpeaking}
+              />
+            </div>
+          )}
         </motion.div>
       )}
 
-      {/* Processing */}
-      {recognitionState === 'processing' && (
+      {/* Processing (legacy mode) */}
+      {recognitionState === 'processing' && !useASRMode && (
         <motion.div
           initial={isMotionReduced ? {} : { opacity: 0 }}
           animate={isMotionReduced ? {} : { opacity: 1 }}
@@ -250,29 +330,52 @@ export default function UsagePage({
       {/* Results */}
       {recognitionState === 'result' && (
         <>
-          <RecognitionResult
-            results={results}
-            isUnknown={isUnknown}
-            onSelect={handleSelect}
-            onSpeak={onSpeak}
-            onStop={onStop}
-            isSpeaking={isSpeaking}
-            onCopy={handleCopy}
-          />
+          {useASRMode ? (
+            <ASRStreamingResult
+              partialText={partialText}
+              finalText={finalText}
+              onSpeak={onSpeak}
+              onStop={onStop}
+              isSpeaking={isSpeaking}
+            />
+          ) : (
+            <RecognitionResult
+              results={results}
+              isUnknown={isUnknown}
+              onSelect={handleSelect}
+              onSpeak={onSpeak}
+              onStop={onStop}
+              isSpeaking={isSpeaking}
+              onCopy={handleCopy}
+            />
+          )}
           <button
             onClick={handleReset}
             className="a11y-target flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 text-sm font-medium text-foreground hover:bg-muted transition-colors"
           >
-            <RotateCcw className="h-4 w-4" />
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
             再说一次
-            <kbd className="kbd-hint ml-2">R</kbd>
+            <kbd className="kbd-hint ml-2" aria-hidden="true">R</kbd>
           </button>
         </>
       )}
 
-      {error && (
+      {/* No result from ASR */}
+      {recognitionState === 'result' && useASRMode && !finalText && !partialText && !isRecognizing && (
+        <motion.div
+          initial={isMotionReduced ? {} : { opacity: 0 }}
+          animate={isMotionReduced ? {} : { opacity: 1 }}
+          className="rounded-xl border border-border bg-card p-6 text-center"
+          role="alert"
+        >
+          <Mic className="mx-auto mb-3 h-10 w-10 text-muted-foreground" aria-hidden="true" />
+          <p className="text-sm text-muted-foreground">未能识别到语音内容，请重试</p>
+        </motion.div>
+      )}
+
+      {(recError || asrError) && (
         <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive" role="alert">
-          {error}
+          {recError || asrError}
         </div>
       )}
     </section>

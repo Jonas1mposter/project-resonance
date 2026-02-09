@@ -23,6 +23,14 @@ export interface RecognitionResult {
   distance: number;
 }
 
+export interface ASRSettings {
+  appKey: string;
+  accessKey: string;
+  resourceId: string;
+  proxyUrl: string;
+  mockMode: boolean;
+}
+
 export interface AppSettings {
   topK: number;
   absThreshold: number;
@@ -32,7 +40,16 @@ export interface AppSettings {
   ttsVolume: number;
   ttsPitch: number;
   ttsVoice: string;
+  asr: ASRSettings;
 }
+
+export const DEFAULT_ASR_SETTINGS: ASRSettings = {
+  appKey: '',
+  accessKey: '',
+  resourceId: 'volc.bigasr.sauc.duration',
+  proxyUrl: '',
+  mockMode: true,
+};
 
 export const DEFAULT_SETTINGS: AppSettings = {
   topK: 3,
@@ -43,6 +60,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ttsVolume: 1.0,
   ttsPitch: 1.0,
   ttsVoice: '',
+  asr: DEFAULT_ASR_SETTINGS,
 };
 
 export type PageTab = 'training' | 'usage' | 'phrases' | 'settings' | 'data';
