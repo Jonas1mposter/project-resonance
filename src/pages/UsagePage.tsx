@@ -1,10 +1,11 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Mic, RotateCcw } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import AudioRecorderButton from '@/components/AudioRecorderButton';
 import RecognitionResult from '@/components/RecognitionResult';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useAccessibility } from '@/hooks/useAccessibility';
 import { toast } from 'sonner';
 
 interface UsagePageProps {
@@ -172,31 +173,32 @@ export default function UsagePage({
   );
 
   useKeyboardShortcuts(shortcuts, 'high');
+  const { isMotionReduced } = useAccessibility();
 
   if (trainedCount === 0) {
     return (
-      <div className="max-w-lg mx-auto py-16 text-center">
+      <section className="max-w-lg mx-auto py-16 text-center" aria-labelledby="usage-empty-heading">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={isMotionReduced ? {} : { opacity: 0, y: 20 }}
+          animate={isMotionReduced ? {} : { opacity: 1, y: 0 }}
           className="rounded-2xl border border-border bg-card p-8"
         >
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted" aria-hidden="true">
             <Mic className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h2 className="text-xl font-bold text-foreground">还没有训练数据</h2>
+          <h2 id="usage-empty-heading" className="text-xl font-bold text-foreground">还没有训练数据</h2>
           <p className="mt-2 text-muted-foreground">
             请先前往「训练」页面，为词表中的短语录制语音样本（每条至少 2 遍）
           </p>
         </motion.div>
-      </div>
+      </section>
     );
   }
 
   return (
-    <div className="max-w-lg mx-auto space-y-6">
+    <section className="max-w-lg mx-auto space-y-6" aria-labelledby="usage-heading">
       <div>
-        <h2 className="text-2xl font-bold text-foreground">语音识别</h2>
+        <h2 id="usage-heading" className="text-2xl font-bold text-foreground">语音识别</h2>
         <p className="mt-1 text-muted-foreground">
           已有 {trainedCount} 条短语可识别
         </p>
@@ -214,8 +216,8 @@ export default function UsagePage({
       {/* Recording Area */}
       {(recognitionState === 'idle' || recognitionState === 'recording') && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial={isMotionReduced ? {} : { opacity: 0 }}
+          animate={isMotionReduced ? {} : { opacity: 1 }}
           className="rounded-2xl border border-border bg-card p-8"
         >
           <div className="flex flex-col items-center">
@@ -234,11 +236,13 @@ export default function UsagePage({
       {/* Processing */}
       {recognitionState === 'processing' && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial={isMotionReduced ? {} : { opacity: 0 }}
+          animate={isMotionReduced ? {} : { opacity: 1 }}
           className="rounded-2xl border border-border bg-card p-8 text-center"
+          role="status"
+          aria-live="polite"
         >
-          <div className="mx-auto mb-4 h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+          <div className="mx-auto mb-4 h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin" aria-hidden="true" />
           <p className="text-foreground font-medium">正在识别...</p>
         </motion.div>
       )}
@@ -271,6 +275,6 @@ export default function UsagePage({
           {error}
         </div>
       )}
-    </div>
+    </section>
   );
 }

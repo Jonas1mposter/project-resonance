@@ -65,10 +65,10 @@ export default function PhrasesPage({
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <section className="max-w-2xl mx-auto space-y-6" aria-labelledby="phrases-heading">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">词表管理</h2>
+          <h2 id="phrases-heading" className="text-2xl font-bold text-foreground">词表管理</h2>
           <p className="mt-1 text-muted-foreground">共 {phrases.length} 条短语</p>
         </div>
         <div className="flex gap-2">
@@ -223,33 +223,35 @@ export default function PhrasesPage({
                   setEditingId(phrase.id);
                   setEditText(phrase.text);
                 }}
-                className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                title="编辑"
+                className="a11y-target rounded-md p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                aria-label={`编辑「${phrase.text}」`}
               >
-                <Edit2 className="h-3.5 w-3.5" />
+                <Edit2 className="h-4 w-4" aria-hidden="true" />
               </button>
               <button
                 onClick={() => onUpdate(phrase.id, { enabled: !phrase.enabled })}
-                className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                title={phrase.enabled ? '禁用' : '启用'}
+                className="a11y-target rounded-md p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                aria-label={phrase.enabled ? `禁用「${phrase.text}」` : `启用「${phrase.text}」`}
+                role="switch"
+                aria-checked={phrase.enabled}
               >
                 {phrase.enabled ? (
-                  <ToggleRight className="h-4 w-4 text-success" />
+                  <ToggleRight className="h-5 w-5 text-success" aria-hidden="true" />
                 ) : (
-                  <ToggleLeft className="h-4 w-4" />
+                  <ToggleLeft className="h-5 w-5" aria-hidden="true" />
                 )}
               </button>
               <button
                 onClick={() => onDelete(phrase.id)}
-                className="rounded-md p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                title="删除"
+                className="a11y-target rounded-md p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                aria-label={`删除「${phrase.text}」`}
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

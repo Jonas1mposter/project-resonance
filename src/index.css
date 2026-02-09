@@ -6,6 +6,8 @@
 
 @layer base {
   :root {
+    --font-scale: 1;
+
     --background: 35 20% 97%;
     --foreground: 220 25% 12%;
 
@@ -53,6 +55,10 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Focus ring width (boosted in high-contrast) */
+    --focus-ring-width: 3px;
+    --focus-ring-offset: 2px;
   }
 
   .dark {
@@ -102,6 +108,22 @@
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
+  /* ===== Apple-style High Contrast Mode ===== */
+  .high-contrast,
+  .high-contrast.dark {
+    --border: 220 20% 40%;
+    --input: 220 20% 40%;
+    --muted-foreground: 220 15% 30%;
+    --focus-ring-width: 4px;
+    --focus-ring-offset: 3px;
+  }
+
+  .high-contrast.dark {
+    --border: 220 15% 50%;
+    --input: 220 15% 50%;
+    --muted-foreground: 220 10% 75%;
+  }
 }
 
 @layer base {
@@ -116,6 +138,7 @@
 }
 
 @layer utilities {
+  /* ===== Recording pulse animation ===== */
   .recording-pulse {
     animation: recordingPulse 1.5s ease-in-out infinite;
   }
@@ -129,6 +152,12 @@
     }
   }
 
+  /* Disable recording pulse in reduced motion */
+  .reduce-motion .recording-pulse {
+    animation: none;
+    box-shadow: 0 0 0 4px hsl(var(--recording) / 0.3);
+  }
+
   .card-hover {
     @apply transition-all duration-200;
   }
@@ -138,15 +167,28 @@
     box-shadow: 0 8px 25px -8px hsl(var(--foreground) / 0.1);
   }
 
-  /* ===== Accessibility: Enhanced Focus Styles ===== */
+  /* Disable card hover motion */
+  .reduce-motion .card-hover:hover {
+    transform: none;
+  }
+
+  /* ===== Apple Accessibility: Focus Styles ===== */
   /* High-contrast focus ring for keyboard navigation */
   *:focus-visible {
-    outline: 3px solid hsl(var(--ring));
-    outline-offset: 2px;
+    outline: var(--focus-ring-width) solid hsl(var(--ring));
+    outline-offset: var(--focus-ring-offset);
     border-radius: var(--radius);
   }
 
-  /* Minimum 48x48 touch/click target for a11y */
+  /* Always show focus mode (like Apple's "Increase Contrast" + Full Keyboard Access) */
+  .always-show-focus *:focus {
+    outline: var(--focus-ring-width) solid hsl(var(--ring));
+    outline-offset: var(--focus-ring-offset);
+    border-radius: var(--radius);
+  }
+
+  /* ===== Apple Accessibility: Minimum Touch Targets ===== */
+  /* Standard a11y target: 48x48 (meets WCAG 2.5.8) */
   .a11y-target {
     min-width: 48px;
     min-height: 48px;
@@ -160,9 +202,62 @@
     @apply flex items-center justify-center;
   }
 
-  /* Keyboard shortcut badge */
+  /* When large targets mode is on, boost all targets */
+  .large-targets .a11y-target {
+    min-width: 56px;
+    min-height: 56px;
+  }
+
+  .large-targets .a11y-target-lg {
+    min-width: 64px;
+    min-height: 64px;
+  }
+
+  /* ===== Keyboard shortcut badge ===== */
   .kbd-hint {
     @apply inline-flex items-center justify-center rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-mono font-semibold text-muted-foreground leading-none;
     min-width: 1.25rem;
+  }
+
+  /* ===== Apple Accessibility: Reduce Motion ===== */
+  /* Disable all CSS transitions/animations */
+  .reduce-motion *,
+  .reduce-motion *::before,
+  .reduce-motion *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Also respect system preference as baseline */
+  @media (prefers-reduced-motion: reduce) {
+    .recording-pulse {
+      animation: none;
+      box-shadow: 0 0 0 4px hsl(var(--recording) / 0.3);
+    }
+  }
+
+  /* ===== Apple Accessibility: High Contrast enhancements ===== */
+  .high-contrast .rounded-xl,
+  .high-contrast .rounded-lg,
+  .high-contrast .rounded-2xl {
+    border-width: 2px;
+  }
+
+  .high-contrast .text-muted-foreground {
+    color: hsl(var(--foreground) / 0.75);
+  }
+
+  /* ===== VoiceOver: Screen reader only (visually hidden) ===== */
+  .sr-description {
+    @apply sr-only;
+  }
+
+  /* ===== Scroll behavior ===== */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 }

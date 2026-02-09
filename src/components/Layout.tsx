@@ -1,10 +1,11 @@
-import { ReactNode, useCallback, useMemo } from 'react';
+import { ReactNode, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, BookOpen, List, Settings, Database, Keyboard } from 'lucide-react';
 import SkipToContent from './SkipToContent';
 import KeyboardShortcutsPanel from './KeyboardShortcutsPanel';
 import { useKeyboardShortcuts, useShortcutHelpPanel } from '@/hooks/useKeyboardShortcuts';
+import { useAccessibility } from '@/hooks/useAccessibility';
 
 interface LayoutProps {
   children: ReactNode;
@@ -59,6 +60,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { isOpen: shortcutsOpen, toggle: toggleShortcuts, close: closeShortcuts } = useShortcutHelpPanel();
+  const { isMotionReduced } = useAccessibility();
 
   // Plain number key navigation (normal priority, page shortcuts override via capture phase)
   const navShortcuts = useMemo(
@@ -74,15 +76,31 @@ export default function Layout({ children }: LayoutProps) {
 
   useKeyboardShortcuts(navShortcuts, 'normal');
 
+  // Motion variants — disabled when reduce-motion is on
+  const pageVariants = isMotionReduced
+    ? { initial: {}, animate: {}, exit: {} }
+    : {
+        initial: { opacity: 0, y: 8 },
+        animate: { opacity: 1, y: 0 },
+        exit: { opacity: 0, y: -8 },
+      };
+
+  const tabIndicatorTransition = isMotionReduced
+    ? { duration: 0 }
+    : { type: 'spring' as const, stiffness: 400, damping: 30 };
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <SkipToContent />
 
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
+      <header
+        className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md"
+        role="banner"
+      >
         <div className="container flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary" aria-hidden="true">
               <Mic className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
@@ -105,14 +123,14 @@ export default function Layout({ children }: LayoutProps) {
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                     }`}
                   >
-                    <tab.icon className="h-4 w-4" />
+                    <tab.icon className="h-4 w-4" aria-hidden="true" />
                     {tab.label}
-                    <span className="kbd-hint ml-1 hidden lg:inline-flex">{tab.shortcutKey}</span>
+                    <span className="kbd-hint ml-1 hidden lg:inline-flex" aria-hidden="true">{tab.shortcutKey}</span>
                     {isActive && (
                       <motion.div
                         layoutId="activeTab"
                         className="absolute inset-0 rounded-lg bg-primary/10"
-                        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                        transition={tabIndicatorTransition}
                       />
                     )}
                   </button>
@@ -126,21 +144,19 @@ export default function Layout({ children }: LayoutProps) {
               aria-label="显示键盘快捷键帮助"
               title="键盘快捷键 (?)"
             >
-              <Keyboard className="h-4 w-4" />
+              <Keyboard className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main id="main-content" className="flex-1" role="main">
+      <main id="main-content" className="flex-1" role="main" aria-label="主要内容">
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
+            {...pageVariants}
+            transition={isMotionReduced ? { duration: 0 } : { duration: 0.2 }}
             className="container px-4 py-6"
           >
             {children}
@@ -162,14 +178,15 @@ export default function Layout({ children }: LayoutProps) {
                 key={tab.path}
                 onClick={() => navigate(tab.path)}
                 aria-current={isActive ? 'page' : undefined}
+                aria-label={tab.label}
                 className={`a11y-target flex flex-col items-center gap-1 rounded-lg px-3 py-1.5 text-xs transition-colors ${
                   isActive
                     ? 'text-primary'
                     : 'text-muted-foreground'
                 }`}
               >
-                <tab.icon className={`h-5 w-5 ${isActive ? 'text-primary' : ''}`} />
-                {tab.label}
+                <tab.icon className={`h-5 w-5 ${isActive ? 'text-primary' : ''}`} aria-hidden="true" />
+                <span aria-hidden="true">{tab.label}</span>
               </button>
             );
           })}
