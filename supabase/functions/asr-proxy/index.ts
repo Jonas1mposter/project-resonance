@@ -52,11 +52,11 @@ Deno.serve((req) => {
   const { socket: clientWs, response } = Deno.upgradeWebSocket(req);
 
   let upstream: InstanceType<typeof WS> | null = null;
+  const pendingQueue: (ArrayBuffer | string)[] = [];
 
   clientWs.onopen = () => {
     console.log("[asr-proxy] Client connected, opening upstream…");
 
-    // Connect to Volcengine with auth headers via npm:ws
     upstream = new WS(VOLCENGINE_ASR_URL, {
       headers: {
         "X-Api-App-Key": appKey,
@@ -65,23 +65,30 @@ Deno.serve((req) => {
       },
     });
 
-    // Receive binary frames from the server
     upstream.binaryType = "arraybuffer";
 
     upstream.on("open", () => {
-      console.log("[asr-proxy] Upstream connected");
+      console.log("[asr-proxy] Upstream connected, flushing", pendingQueue.length, "buffered messages");
+      // Flush buffered messages
+      for (const msg of pendingQueue) {
+        if (msg instanceof ArrayBuffer) {
+          upstream!.send(new Uint8Array(msg));
+        } else {
+          upstream!.send(msg);
+        }
+      }
+      pendingQueue.length = 0;
     });
 
-    upstream.on("message", (data: ArrayBuffer | Buffer) => {
+    upstream.on("message", (data: ArrayBuffer | Uint8Array) => {
       try {
         if (clientWs.readyState === WebSocket.OPEN) {
-          // Ensure we send an ArrayBuffer
           const buf =
             data instanceof ArrayBuffer
               ? data
-              : (data as Buffer).buffer.slice(
-                  (data as Buffer).byteOffset,
-                  (data as Buffer).byteOffset + (data as Buffer).byteLength,
+              : (data as Uint8Array).buffer.slice(
+                  (data as Uint8Array).byteOffset,
+                  (data as Uint8Array).byteOffset + (data as Uint8Array).byteLength,
                 );
           clientWs.send(buf);
         }
@@ -108,15 +115,21 @@ Deno.serve((req) => {
   // Relay client → upstream (binary ASR protocol frames)
   clientWs.onmessage = (event: MessageEvent) => {
     try {
+      const data = event.data;
       if (upstream && upstream.readyState === WS.OPEN) {
-        const data = event.data;
         if (data instanceof ArrayBuffer) {
-          upstream.send(Buffer.from(data));
+          upstream.send(new Uint8Array(data));
         } else if (typeof data === "string") {
           upstream.send(data);
         }
       } else {
-        console.warn("[asr-proxy] Upstream not ready, buffering skipped");
+        // Buffer messages until upstream is ready
+        if (data instanceof ArrayBuffer) {
+          pendingQueue.push(data);
+        } else if (typeof data === "string") {
+          pendingQueue.push(data);
+        }
+        console.log("[asr-proxy] Upstream not ready, buffered message (queue:", pendingQueue.length, ")");
       }
     } catch (e) {
       console.error("[asr-proxy] Error relaying client→upstream:", e);
