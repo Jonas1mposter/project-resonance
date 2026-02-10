@@ -161,15 +161,15 @@ function parseServerResponse(data: ArrayBuffer): {
   const payloadSize = view.getUint32(4, false);
 
   let payload: string | null = null;
-  if (payloadSize > 0) {
+  if (payloadSize > 0 && data.byteLength >= 8 + payloadSize) {
     const payloadBytes = new Uint8Array(data, 8, payloadSize);
 
     if (compressionType === GZIP_COMPRESSION) {
-      // Decompress gzip - use DecompressionStream API
       payload = '[gzip compressed - needs decompression]';
       console.warn('Gzip compression in ASR response not yet handled');
     } else {
-      payload = new TextDecoder().decode(payloadBytes);
+      // Decode and strip any trailing null bytes
+      payload = new TextDecoder().decode(payloadBytes).replace(/\0+$/, '');
     }
   }
 
@@ -288,10 +288,23 @@ export class VolcengineASRClient {
       },
     };
 
-    const message = buildFullClientRequest(reqParams);
-    this.ws?.send(message);
+    // Use POS_SEQUENCE to indicate more audio will follow
+    const jsonPayload = JSON.stringify(reqParams);
+    const jsonBytes = new TextEncoder().encode(jsonPayload);
+    const header = buildHeader(
+      FULL_CLIENT_REQUEST,
+      POS_SEQUENCE,
+      JSON_SERIALIZATION,
+      NO_COMPRESSION,
+      jsonBytes.length
+    );
+    const result = new Uint8Array(header.byteLength + jsonBytes.length);
+    result.set(new Uint8Array(header), 0);
+    result.set(jsonBytes, header.byteLength);
+
+    this.ws?.send(result.buffer);
     this.setState('recognizing');
-    console.log('[ASR] Sent full_client_request');
+    console.log('[ASR] Sent full_client_request with POS_SEQUENCE');
   }
 
   /**
