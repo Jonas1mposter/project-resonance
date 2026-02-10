@@ -132,26 +132,28 @@ function buildFullClientRequest(
 }
 
 /**
- * Build an audio_only_request message WITH explicit sequence number.
- * POS_SEQUENCE/NEG_SEQUENCE flags require header_size=2.
+ * Build an audio_only_request message with sequence number.
+ * 
+ * For audio messages with POS_SEQUENCE/NEG_SEQUENCE:
+ *   header_size=1, bytes 4-7 = sequence number (NOT payload_size!)
+ *   Audio data follows directly at byte 8 with no payload_size field.
  */
 function buildAudioOnlyRequest(
   audioData: ArrayBuffer,
   sequenceNumber: number,
   isLast: boolean
 ): ArrayBuffer {
-  const header = buildHeaderWithSeq(
-    AUDIO_ONLY_REQUEST,
-    isLast ? NEG_SEQUENCE : POS_SEQUENCE,
-    NO_COMPRESSION,
-    NO_COMPRESSION,
-    isLast ? -sequenceNumber : sequenceNumber,
-    audioData.byteLength
-  );
+  const buffer = new ArrayBuffer(8);
+  const view = new DataView(buffer);
+  view.setUint8(0, (PROTOCOL_VERSION << 4) | HEADER_SIZE_1);
+  view.setUint8(1, (AUDIO_ONLY_REQUEST << 4) | (isLast ? NEG_SEQUENCE : POS_SEQUENCE));
+  view.setUint8(2, (NO_COMPRESSION << 4) | NO_COMPRESSION);
+  view.setUint8(3, 0x00);
+  view.setInt32(4, isLast ? -sequenceNumber : sequenceNumber, false);
 
-  const result = new Uint8Array(header.byteLength + audioData.byteLength);
-  result.set(new Uint8Array(header), 0);
-  result.set(new Uint8Array(audioData), header.byteLength);
+  const result = new Uint8Array(8 + audioData.byteLength);
+  result.set(new Uint8Array(buffer), 0);
+  result.set(new Uint8Array(audioData), 8);
 
   return result.buffer;
 }
