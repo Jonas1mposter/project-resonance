@@ -1,7 +1,5 @@
-import { useState } from 'react';
-import { Eye, EyeOff, Globe, Key, Settings, Zap } from 'lucide-react';
+import { Settings, Zap, ShieldCheck } from 'lucide-react';
 import { ASRSettings, DEFAULT_ASR_SETTINGS } from '@/types';
-import { Input } from '@/components/ui/input';
 
 interface ASRSettingsPanelProps {
   settings: ASRSettings;
@@ -9,8 +7,6 @@ interface ASRSettingsPanelProps {
 }
 
 export default function ASRSettingsPanel({ settings, onUpdate }: ASRSettingsPanelProps) {
-  const [showKeys, setShowKeys] = useState(false);
-
   const update = (key: keyof ASRSettings, value: string | boolean) => {
     onUpdate({ ...settings, [key]: value });
   };
@@ -58,85 +54,13 @@ export default function ASRSettingsPanel({ settings, onUpdate }: ASRSettingsPane
         </button>
       </div>
 
-      {/* API Configuration - only show when not in mock mode */}
+      {/* API Status - show when not in mock mode */}
       {!settings.mockMode && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-foreground flex items-center gap-1.5">
-              <Key className="h-3.5 w-3.5" aria-hidden="true" />
-              API 凭证
-            </span>
-            <button
-              onClick={() => setShowKeys(!showKeys)}
-              className="a11y-target inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              aria-label={showKeys ? '隐藏密钥' : '显示密钥'}
-            >
-              {showKeys ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-              {showKeys ? '隐藏' : '显示'}
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <label htmlFor="asr-app-key" className="text-xs font-medium text-muted-foreground block mb-1">
-                App Key (X-Api-App-Key)
-              </label>
-              <Input
-                id="asr-app-key"
-                type={showKeys ? 'text' : 'password'}
-                value={settings.appKey}
-                onChange={(e) => update('appKey', e.target.value)}
-                placeholder="控制台获取的 APP ID"
-                className="a11y-target"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="asr-access-key" className="text-xs font-medium text-muted-foreground block mb-1">
-                Access Key (X-Api-Access-Key)
-              </label>
-              <Input
-                id="asr-access-key"
-                type={showKeys ? 'text' : 'password'}
-                value={settings.accessKey}
-                onChange={(e) => update('accessKey', e.target.value)}
-                placeholder="控制台获取的 Access Key"
-                className="a11y-target"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="asr-resource-id" className="text-xs font-medium text-muted-foreground block mb-1">
-                Resource ID (X-Api-Resource-Id)
-              </label>
-              <Input
-                id="asr-resource-id"
-                type="text"
-                value={settings.resourceId}
-                onChange={(e) => update('resourceId', e.target.value)}
-                placeholder="volc.bigasr.sauc.duration"
-                className="a11y-target"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="asr-proxy-url" className="text-xs font-medium text-muted-foreground block mb-1 flex items-center gap-1">
-              <Globe className="h-3 w-3" aria-hidden="true" />
-              代理地址（可选）
-            </label>
-            <Input
-              id="asr-proxy-url"
-              type="text"
-              value={settings.proxyUrl}
-              onChange={(e) => update('proxyUrl', e.target.value)}
-              placeholder="wss://your-proxy.example.com/asr"
-              className="a11y-target"
-            />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              浏览器无法直接设置 WebSocket 自定义头，需通过代理服务转发鉴权请求
-            </p>
-          </div>
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
+          <ShieldCheck className="h-4 w-4 text-success shrink-0" aria-hidden="true" />
+          <p className="text-xs text-muted-foreground">
+            API 密钥已在后端安全配置，无需手动输入
+          </p>
         </div>
       )}
 
