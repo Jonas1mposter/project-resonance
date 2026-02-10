@@ -3,18 +3,22 @@
  * 
  * Protocol: wss://openspeech.bytedance.com/api/v3/sauc/bigmodel
  * 
- * Binary message format:
- * - Byte 0: protocol_version (4 bits) | header_size (4 bits)
- * - Byte 1: message_type (4 bits) | message_type_flags (4 bits)
- * - Byte 2: serialization_method (4 bits) | compression_type (4 bits)
- * - Byte 3: reserved (8 bits)
- * - Bytes 4-7: payload_size (uint32, big-endian)
- * - Bytes 8+: payload
+ * Binary message format (header_size=1, no sequence):
+ *   Bytes 0-3:  header (version|hsize, type|flags, serial|compress, reserved)
+ *   Bytes 4-7:  payload_size (uint32 big-endian)
+ *   Bytes 8+:   payload
+ *
+ * Binary message format (header_size=2, with sequence):
+ *   Bytes 0-3:  header
+ *   Bytes 4-7:  sequence number (int32 big-endian)
+ *   Bytes 8-11: payload_size (uint32 big-endian)
+ *   Bytes 12+:  payload
  */
 
 // Protocol constants
 const PROTOCOL_VERSION = 0b0001;
-const DEFAULT_HEADER_SIZE = 0b0001; // 4 bytes
+const HEADER_SIZE_NO_SEQ = 0b0001; // 1 unit = 4 bytes (no sequence)
+const HEADER_SIZE_WITH_SEQ = 0b0010; // 2 units = 8 bytes (with sequence)
 
 // Message types
 const FULL_CLIENT_REQUEST = 0b0001;
@@ -61,51 +65,62 @@ export interface ASRUtterance {
 export type ASRState = 'idle' | 'connecting' | 'connected' | 'recognizing' | 'error';
 
 /**
- * Build a binary protocol header for the Volcengine ASR service
+ * Build a binary protocol header WITHOUT sequence number (header_size=1)
  */
-function buildHeader(
+function buildHeaderNoSeq(
   messageType: number,
-  messageTypeFlags: number,
   serializationMethod: number,
   compressionType: number,
   payloadSize: number
 ): ArrayBuffer {
   const buffer = new ArrayBuffer(8);
   const view = new DataView(buffer);
-
-  // Byte 0: protocol_version (4 bits) | header_size (4 bits)
-  view.setUint8(0, (PROTOCOL_VERSION << 4) | DEFAULT_HEADER_SIZE);
-
-  // Byte 1: message_type (4 bits) | message_type_flags (4 bits)
-  view.setUint8(1, (messageType << 4) | messageTypeFlags);
-
-  // Byte 2: serialization_method (4 bits) | compression_type (4 bits)
+  view.setUint8(0, (PROTOCOL_VERSION << 4) | HEADER_SIZE_NO_SEQ);
+  view.setUint8(1, (messageType << 4) | NO_SEQUENCE);
   view.setUint8(2, (serializationMethod << 4) | compressionType);
-
-  // Byte 3: reserved
   view.setUint8(3, 0x00);
-
-  // Bytes 4-7: payload_size (uint32, big-endian)
   view.setUint32(4, payloadSize, false);
-
   return buffer;
 }
 
 /**
- * Build the full_client_request message (first message with config + optional audio)
+ * Build a binary protocol header WITH sequence number (header_size=2)
+ */
+function buildHeaderWithSeq(
+  messageType: number,
+  messageTypeFlags: number,
+  serializationMethod: number,
+  compressionType: number,
+  sequenceNumber: number,
+  payloadSize: number
+): ArrayBuffer {
+  const buffer = new ArrayBuffer(12);
+  const view = new DataView(buffer);
+  view.setUint8(0, (PROTOCOL_VERSION << 4) | HEADER_SIZE_WITH_SEQ);
+  view.setUint8(1, (messageType << 4) | messageTypeFlags);
+  view.setUint8(2, (serializationMethod << 4) | compressionType);
+  view.setUint8(3, 0x00);
+  view.setInt32(4, sequenceNumber, false); // signed int32 for negative sequences
+  view.setUint32(8, payloadSize, false);
+  return buffer;
+}
+
+/**
+ * Build the full_client_request message (first message with config)
+ * Uses POS_SEQUENCE with sequence=1
  */
 function buildFullClientRequest(
-  reqParams: Record<string, unknown>,
-  audioData?: ArrayBuffer
+  reqParams: Record<string, unknown>
 ): ArrayBuffer {
   const jsonPayload = JSON.stringify(reqParams);
   const jsonBytes = new TextEncoder().encode(jsonPayload);
 
-  const header = buildHeader(
+  const header = buildHeaderWithSeq(
     FULL_CLIENT_REQUEST,
-    audioData ? POS_SEQUENCE : NEG_SEQUENCE,
+    POS_SEQUENCE,
     JSON_SERIALIZATION,
     NO_COMPRESSION,
+    1, // sequence number 1 for first message
     jsonBytes.length
   );
 
@@ -117,17 +132,19 @@ function buildFullClientRequest(
 }
 
 /**
- * Build an audio_only_request message
+ * Build an audio_only_request message with sequence number
  */
 function buildAudioOnlyRequest(
   audioData: ArrayBuffer,
+  sequenceNumber: number,
   isLast: boolean
 ): ArrayBuffer {
-  const header = buildHeader(
+  const header = buildHeaderWithSeq(
     AUDIO_ONLY_REQUEST,
     isLast ? NEG_SEQUENCE : POS_SEQUENCE,
     NO_COMPRESSION, // no serialization for raw audio
     NO_COMPRESSION,
+    isLast ? -sequenceNumber : sequenceNumber,
     audioData.byteLength
   );
 
@@ -150,6 +167,9 @@ function parseServerResponse(data: ArrayBuffer): {
 } {
   const view = new DataView(data);
 
+  const byte0 = view.getUint8(0);
+  const headerSize = byte0 & 0x0f; // header size in 4-byte units
+
   const byte1 = view.getUint8(1);
   const messageType = (byte1 >> 4) & 0x0f;
   const messageTypeFlags = byte1 & 0x0f;
@@ -158,11 +178,18 @@ function parseServerResponse(data: ArrayBuffer): {
   const serializationMethod = (byte2 >> 4) & 0x0f;
   const compressionType = byte2 & 0x0f;
 
-  const payloadSize = view.getUint32(4, false);
+  // Payload size is at offset (headerSize * 4)
+  const payloadSizeOffset = headerSize * 4;
+  if (data.byteLength < payloadSizeOffset + 4) {
+    return { messageType, messageTypeFlags, serializationMethod, compressionType, payload: null };
+  }
+
+  const payloadSize = view.getUint32(payloadSizeOffset, false);
+  const payloadOffset = payloadSizeOffset + 4;
 
   let payload: string | null = null;
-  if (payloadSize > 0 && data.byteLength >= 8 + payloadSize) {
-    const payloadBytes = new Uint8Array(data, 8, payloadSize);
+  if (payloadSize > 0 && data.byteLength >= payloadOffset + payloadSize) {
+    const payloadBytes = new Uint8Array(data, payloadOffset, payloadSize);
 
     if (compressionType === GZIP_COMPRESSION) {
       payload = '[gzip compressed - needs decompression]';
@@ -200,6 +227,7 @@ export class VolcengineASRClient {
   private callbacks: ASRCallbacks;
   private state: ASRState = 'idle';
   private connectId: string = '';
+  private sequenceCounter: number = 1; // starts at 1, incremented per message
 
   constructor(config: ASRConfig, callbacks: ASRCallbacks) {
     this.config = config;
@@ -224,10 +252,9 @@ export class VolcengineASRClient {
     }
 
     this.connectId = generateUUID();
+    this.sequenceCounter = 1;
     this.setState('connecting');
 
-    // Build the WebSocket URL
-    // NOTE: In production, this should go through a proxy that adds the auth headers
     const wsUrl = this.config.proxyUrl 
       || `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel`;
 
@@ -288,23 +315,11 @@ export class VolcengineASRClient {
       },
     };
 
-    // Use POS_SEQUENCE to indicate more audio will follow
-    const jsonPayload = JSON.stringify(reqParams);
-    const jsonBytes = new TextEncoder().encode(jsonPayload);
-    const header = buildHeader(
-      FULL_CLIENT_REQUEST,
-      POS_SEQUENCE,
-      JSON_SERIALIZATION,
-      NO_COMPRESSION,
-      jsonBytes.length
-    );
-    const result = new Uint8Array(header.byteLength + jsonBytes.length);
-    result.set(new Uint8Array(header), 0);
-    result.set(jsonBytes, header.byteLength);
-
-    this.ws?.send(result.buffer);
+    const message = buildFullClientRequest(reqParams);
+    this.sequenceCounter = 2; // next audio chunk starts at 2
+    this.ws?.send(message);
     this.setState('recognizing');
-    console.log('[ASR] Sent full_client_request with POS_SEQUENCE');
+    console.log('[ASR] Sent full_client_request (seq=1)');
   }
 
   /**
@@ -316,11 +331,13 @@ export class VolcengineASRClient {
       return;
     }
 
-    const message = buildAudioOnlyRequest(audioData, isLast);
+    const seq = this.sequenceCounter;
+    const message = buildAudioOnlyRequest(audioData, seq, isLast);
     this.ws.send(message);
+    this.sequenceCounter++;
 
     if (isLast) {
-      console.log('[ASR] Sent last audio chunk (negative sequence)');
+      console.log('[ASR] Sent last audio chunk (neg seq=' + (-seq) + ')');
     }
   }
 
@@ -328,13 +345,11 @@ export class VolcengineASRClient {
    * Handle incoming server messages
    */
   private handleMessage(data: ArrayBuffer | Blob | string): void {
-    // If data is a string, it's not a binary protocol frame — ignore
     if (typeof data === 'string') {
       console.log('[ASR] Received text message (ignored):', data.slice(0, 100));
       return;
     }
 
-    // Handle Blob by converting to ArrayBuffer
     if (data instanceof Blob) {
       data.arrayBuffer().then((buf) => this.handleBinaryMessage(buf));
       return;
@@ -345,8 +360,7 @@ export class VolcengineASRClient {
 
   private handleBinaryMessage(data: ArrayBuffer): void {
     try {
-      // Need at least 8 bytes for header
-      if (data.byteLength < 8) {
+      if (data.byteLength < 4) {
         console.warn('[ASR] Received too-short frame, length:', data.byteLength);
         return;
       }
@@ -371,7 +385,7 @@ export class VolcengineASRClient {
               this.callbacks.onPartialResult(text);
             }
           } catch (parseErr) {
-            console.warn('[ASR] Could not parse payload JSON:', parseErr);
+            console.warn('[ASR] Could not parse payload JSON:', parseErr, response.payload?.slice(0, 200));
           }
         }
       } else if (response.messageType === SERVER_ACK) {
@@ -401,14 +415,16 @@ export class VolcengineASRClient {
 
 // Export protocol utilities for testing
 export const protocol = {
-  buildHeader,
+  buildHeaderNoSeq,
+  buildHeaderWithSeq,
   buildFullClientRequest,
   buildAudioOnlyRequest,
   parseServerResponse,
   generateUUID,
   constants: {
     PROTOCOL_VERSION,
-    DEFAULT_HEADER_SIZE,
+    HEADER_SIZE_NO_SEQ,
+    HEADER_SIZE_WITH_SEQ,
     FULL_CLIENT_REQUEST,
     AUDIO_ONLY_REQUEST,
     SERVER_FULL_RESPONSE,
