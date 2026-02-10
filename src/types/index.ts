@@ -48,7 +48,7 @@ export const DEFAULT_ASR_SETTINGS: ASRSettings = {
   accessKey: '',
   resourceId: 'volc.bigasr.sauc.duration',
   proxyUrl: '',
-  mockMode: true,
+  mockMode: false,
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
