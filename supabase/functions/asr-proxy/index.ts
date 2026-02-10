@@ -12,6 +12,20 @@ import WS from "npm:ws@8.18.0";
 
 const VOLCENGINE_ASR_URL = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel";
 
+function toUint8Array(data: unknown): Uint8Array | null {
+  if (data instanceof ArrayBuffer) {
+    return new Uint8Array(data);
+  }
+  if (data instanceof Uint8Array) {
+    return data;
+  }
+  if (ArrayBuffer.isView(data)) {
+    const view = data as ArrayBufferView;
+    return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+  }
+  return null;
+}
+
 Deno.serve((req) => {
   // Only accept WebSocket upgrades
   const upgradeHeader = req.headers.get("upgrade") || "";
@@ -52,16 +66,19 @@ Deno.serve((req) => {
   const { socket: clientWs, response } = Deno.upgradeWebSocket(req);
 
   let upstream: InstanceType<typeof WS> | null = null;
-  const pendingQueue: (ArrayBuffer | string)[] = [];
+  const pendingQueue: Uint8Array[] = [];
 
   clientWs.onopen = () => {
     console.log("[asr-proxy] Client connected, opening upstream…");
+
+    const requestId = crypto.randomUUID();
 
     upstream = new WS(VOLCENGINE_ASR_URL, {
       headers: {
         "X-Api-App-Key": appKey,
         "X-Api-Access-Key": accessKey,
         "X-Api-Resource-Id": resourceId,
+        "X-Api-Request-Id": requestId,
       },
     });
 
@@ -71,11 +88,7 @@ Deno.serve((req) => {
       console.log("[asr-proxy] Upstream connected, flushing", pendingQueue.length, "buffered messages");
       // Flush buffered messages
       for (const msg of pendingQueue) {
-        if (msg instanceof ArrayBuffer) {
-          upstream!.send(new Uint8Array(msg));
-        } else {
-          upstream!.send(msg);
-        }
+        upstream!.send(msg);
       }
       pendingQueue.length = 0;
     });
@@ -91,7 +104,19 @@ Deno.serve((req) => {
             // Buffer or Uint8Array - slice to exact bounds
             bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
           }
-          // Send as a fresh copy to avoid shared buffer issues
+          // Log first response for debugging
+          if (bytes.length >= 4) {
+            const msgType = (bytes[1] >> 4) & 0x0f;
+            console.log("[asr-proxy] Upstream msg: type=", msgType, "len=", bytes.length);
+            // If it looks like a text payload, log it
+            if (bytes.length < 500 && bytes.length > 8) {
+              try {
+                const payloadStr = new TextDecoder().decode(bytes.slice(8));
+                console.log("[asr-proxy] Upstream payload:", payloadStr.slice(0, 200));
+              } catch (_) { /* ignore */ }
+            }
+          }
+          // Send as a fresh copy
           clientWs.send(new Uint8Array(bytes).buffer);
         }
       } catch (e) {
@@ -99,8 +124,11 @@ Deno.serve((req) => {
       }
     });
 
-    upstream.on("close", (code: number, reason: string) => {
-      console.log("[asr-proxy] Upstream closed:", code, reason);
+    upstream.on("close", (code: number, reason: Buffer | string) => {
+      const reasonStr = reason instanceof Buffer
+        ? reason.toString("utf-8")
+        : String(reason);
+      console.log("[asr-proxy] Upstream closed:", code, reasonStr);
       if (clientWs.readyState === WebSocket.OPEN) {
         clientWs.close(1000, "ASR session ended");
       }
@@ -118,20 +146,42 @@ Deno.serve((req) => {
   clientWs.onmessage = (event: MessageEvent) => {
     try {
       const data = event.data;
-      if (upstream && upstream.readyState === WS.OPEN) {
-        if (data instanceof ArrayBuffer) {
-          upstream.send(new Uint8Array(data));
-        } else if (typeof data === "string") {
+      // Convert any binary format to Uint8Array
+      const bytes = toUint8Array(data);
+
+      if (bytes) {
+        // Log first few bytes for debugging
+        if (bytes.length >= 4) {
+          const msgType = (bytes[1] >> 4) & 0x0f;
+          const msgFlags = bytes[1] & 0x0f;
+          console.log("[asr-proxy] Client msg: type=", msgType, "flags=", msgFlags, "len=", bytes.length);
+        }
+
+        if (upstream && upstream.readyState === WS.OPEN) {
+          upstream.send(bytes);
+        } else {
+          pendingQueue.push(new Uint8Array(bytes));
+          console.log("[asr-proxy] Buffered message (queue:", pendingQueue.length, ")");
+        }
+      } else if (typeof data === "string") {
+        console.log("[asr-proxy] Client sent text (unexpected):", data.slice(0, 100));
+        if (upstream && upstream.readyState === WS.OPEN) {
           upstream.send(data);
         }
+      } else if (data instanceof Blob) {
+        // Handle Blob by converting to ArrayBuffer
+        data.arrayBuffer().then((buf) => {
+          const blobBytes = new Uint8Array(buf);
+          console.log("[asr-proxy] Client Blob msg: len=", blobBytes.length);
+          if (upstream && upstream.readyState === WS.OPEN) {
+            upstream.send(blobBytes);
+          } else {
+            pendingQueue.push(blobBytes);
+            console.log("[asr-proxy] Buffered Blob message (queue:", pendingQueue.length, ")");
+          }
+        });
       } else {
-        // Buffer messages until upstream is ready
-        if (data instanceof ArrayBuffer) {
-          pendingQueue.push(data);
-        } else if (typeof data === "string") {
-          pendingQueue.push(data);
-        }
-        console.log("[asr-proxy] Upstream not ready, buffered message (queue:", pendingQueue.length, ")");
+        console.warn("[asr-proxy] Unknown data type:", typeof data, data?.constructor?.name);
       }
     } catch (e) {
       console.error("[asr-proxy] Error relaying client→upstream:", e);
