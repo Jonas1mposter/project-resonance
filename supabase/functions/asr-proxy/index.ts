@@ -124,10 +124,15 @@ Deno.serve((req) => {
       }
     });
 
-    upstream.on("close", (code: number, reason: Buffer | string) => {
-      const reasonStr = reason instanceof Buffer
-        ? reason.toString("utf-8")
-        : String(reason);
+    upstream.on("close", (code: number, reason: unknown) => {
+      let reasonStr = "";
+      try {
+        if (reason instanceof Uint8Array || reason instanceof ArrayBuffer) {
+          reasonStr = new TextDecoder().decode(reason as ArrayBufferLike);
+        } else {
+          reasonStr = String(reason ?? "");
+        }
+      } catch { reasonStr = String(reason); }
       console.log("[asr-proxy] Upstream closed:", code, reasonStr);
       if (clientWs.readyState === WebSocket.OPEN) {
         clientWs.close(1000, "ASR session ended");
