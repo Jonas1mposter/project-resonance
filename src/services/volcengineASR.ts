@@ -219,9 +219,11 @@ export class VolcengineASRClient {
   }
 
   /**
-   * Connect to the ASR WebSocket service
+   * Connect to the ASR WebSocket service.
+   * Returns a Promise that resolves when the connection is open and
+   * the initial full_client_request has been sent.
    */
-  connect(): void {
+  connect(): Promise<void> {
     if (this.ws) {
       this.disconnect();
     }
@@ -231,37 +233,42 @@ export class VolcengineASRClient {
     const wsUrl = this.config.proxyUrl 
       || `wss://openspeech.bytedance.com/api/v3/sauc/bigmodel`;
 
-    try {
-      this.ws = new WebSocket(wsUrl);
-      this.ws.binaryType = 'arraybuffer';
+    return new Promise<void>((resolve, reject) => {
+      try {
+        this.ws = new WebSocket(wsUrl);
+        this.ws.binaryType = 'arraybuffer';
 
-      this.ws.onopen = () => {
-        console.log('[ASR] WebSocket connected');
-        this.setState('connected');
-        this.sendFullClientRequest();
-      };
+        this.ws.onopen = () => {
+          console.log('[ASR] WebSocket connected');
+          this.setState('connected');
+          this.sendFullClientRequest();
+          resolve();
+        };
 
-      this.ws.onmessage = (event) => {
-        this.handleMessage(event.data);
-      };
+        this.ws.onmessage = (event) => {
+          this.handleMessage(event.data);
+        };
 
-      this.ws.onerror = (event) => {
-        console.error('[ASR] WebSocket error:', event);
+        this.ws.onerror = (event) => {
+          console.error('[ASR] WebSocket error:', event);
+          this.setState('error');
+          this.callbacks.onError('WebSocket 连接失败');
+          reject(new Error('WebSocket connection failed'));
+        };
+
+        this.ws.onclose = (event) => {
+          console.log('[ASR] WebSocket closed:', event.code, event.reason);
+          if (this.state !== 'idle') {
+            this.setState('idle');
+          }
+        };
+      } catch (err) {
+        console.error('[ASR] Failed to create WebSocket:', err);
         this.setState('error');
-        this.callbacks.onError('WebSocket 连接失败');
-      };
-
-      this.ws.onclose = (event) => {
-        console.log('[ASR] WebSocket closed:', event.code, event.reason);
-        if (this.state !== 'idle') {
-          this.setState('idle');
-        }
-      };
-    } catch (err) {
-      console.error('[ASR] Failed to create WebSocket:', err);
-      this.setState('error');
-      this.callbacks.onError('无法创建 WebSocket 连接');
-    }
+        this.callbacks.onError('无法创建 WebSocket 连接');
+        reject(err);
+      }
+    });
   }
 
   /**

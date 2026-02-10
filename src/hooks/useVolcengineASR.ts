@@ -227,10 +227,16 @@ export function useVolcengineASR({
       });
 
       clientRef.current = client;
-      client.connect();
 
-      // Start audio capture after connection
-      await startAudioCapture();
+      try {
+        // Wait for WebSocket to connect and send config before capturing audio
+        await client.connect();
+        // Only start audio capture after connection is ready
+        await startAudioCapture();
+      } catch (err) {
+        console.error('[ASR] Connection failed:', err);
+        // Error state already set by client callbacks
+      }
     }
   }, [mockMode, mockPhrases, config, startAudioCapture]);
 
