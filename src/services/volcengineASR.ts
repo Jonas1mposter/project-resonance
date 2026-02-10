@@ -86,6 +86,7 @@ function buildHeaderNoSeq(
 
 /**
  * Build a binary header WITH sequence (header_size=2: 4+4+4=12 bytes)
+ * Layout: [header 4B] [payload_size 4B] [sequence 4B]
  */
 function buildHeaderWithSeq(
   messageType: number,
@@ -101,8 +102,8 @@ function buildHeaderWithSeq(
   view.setUint8(1, (messageType << 4) | messageTypeFlags);
   view.setUint8(2, (serializationMethod << 4) | compressionType);
   view.setUint8(3, 0x00);
-  view.setInt32(4, sequenceNumber, false);
-  view.setUint32(8, payloadSize, false);
+  view.setUint32(4, payloadSize, false);   // payload_size FIRST
+  view.setInt32(8, sequenceNumber, false);  // sequence SECOND
   return buffer;
 }
 
@@ -132,28 +133,26 @@ function buildFullClientRequest(
 }
 
 /**
- * Build an audio_only_request message with sequence number.
- * 
- * For audio messages with POS_SEQUENCE/NEG_SEQUENCE:
- *   header_size=1, bytes 4-7 = sequence number (NOT payload_size!)
- *   Audio data follows directly at byte 8 with no payload_size field.
+ * Build an audio_only_request message with explicit sequence number.
+ * Uses header_size=2: [header 4B] [payload_size 4B] [sequence 4B] [audio...]
  */
 function buildAudioOnlyRequest(
   audioData: ArrayBuffer,
   sequenceNumber: number,
   isLast: boolean
 ): ArrayBuffer {
-  const buffer = new ArrayBuffer(8);
-  const view = new DataView(buffer);
-  view.setUint8(0, (PROTOCOL_VERSION << 4) | HEADER_SIZE_1);
-  view.setUint8(1, (AUDIO_ONLY_REQUEST << 4) | (isLast ? NEG_SEQUENCE : POS_SEQUENCE));
-  view.setUint8(2, (NO_COMPRESSION << 4) | NO_COMPRESSION);
-  view.setUint8(3, 0x00);
-  view.setInt32(4, isLast ? -sequenceNumber : sequenceNumber, false);
+  const header = buildHeaderWithSeq(
+    AUDIO_ONLY_REQUEST,
+    isLast ? NEG_SEQUENCE : POS_SEQUENCE,
+    NO_COMPRESSION,
+    NO_COMPRESSION,
+    isLast ? -sequenceNumber : sequenceNumber,
+    audioData.byteLength
+  );
 
-  const result = new Uint8Array(8 + audioData.byteLength);
-  result.set(new Uint8Array(buffer), 0);
-  result.set(new Uint8Array(audioData), 8);
+  const result = new Uint8Array(header.byteLength + audioData.byteLength);
+  result.set(new Uint8Array(header), 0);
+  result.set(new Uint8Array(audioData), header.byteLength);
 
   return result.buffer;
 }
