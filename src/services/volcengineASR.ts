@@ -3,13 +3,16 @@
  * 
  * Protocol: wss://openspeech.bytedance.com/api/v3/sauc/bigmodel
  * 
- * Binary message format (header_size=1, all message types):
+ * full_client_request format (header_size=1):
  *   Bytes 0-3:  header (version|hsize, type|flags, serial|compress, reserved)
  *   Bytes 4-7:  payload_size (uint32 big-endian)
- *   Bytes 8+:   payload
+ *   Bytes 8+:   JSON payload
  *
- * Server auto-assigns sequence numbers. POS_SEQUENCE/NEG_SEQUENCE flags
- * indicate non-last/last audio chunk respectively.
+ * audio_only_request format (header_size=1, NO payload_size):
+ *   Bytes 0-3:  header only
+ *   Bytes 4+:   raw PCM audio data
+ *   Server determines payload size from WebSocket frame length.
+ *   Server auto-assigns sequence numbers via POS_SEQUENCE/NEG_SEQUENCE flags.
  */
 
 // Protocol constants
@@ -131,25 +134,27 @@ function buildFullClientRequest(
 
 /**
  * Build an audio_only_request message.
- * Uses header_size=1 (same as full_client_request). Server auto-assigns sequence.
- * POS_SEQUENCE flag for non-last, NEG_SEQUENCE flag for last chunk.
+ * Audio messages use a minimal 4-byte header only (NO payload_size field).
+ * The server determines payload size from the WebSocket frame length.
+ * Server auto-assigns sequence numbers; POS_SEQUENCE/NEG_SEQUENCE flags
+ * indicate non-last/last chunk.
  */
 function buildAudioOnlyRequest(
   audioData: ArrayBuffer,
   _sequenceNumber: number,
   isLast: boolean
 ): ArrayBuffer {
-  const header = buildHeaderNoSeq(
-    AUDIO_ONLY_REQUEST,
-    isLast ? NEG_SEQUENCE : POS_SEQUENCE,
-    NO_COMPRESSION,
-    NO_COMPRESSION,
-    audioData.byteLength
-  );
+  // 4-byte header only — no payload_size field for audio messages
+  const buffer = new ArrayBuffer(4);
+  const view = new DataView(buffer);
+  view.setUint8(0, (PROTOCOL_VERSION << 4) | HEADER_SIZE_1);
+  view.setUint8(1, (AUDIO_ONLY_REQUEST << 4) | (isLast ? NEG_SEQUENCE : POS_SEQUENCE));
+  view.setUint8(2, (NO_COMPRESSION << 4) | NO_COMPRESSION);
+  view.setUint8(3, 0x00);
 
-  const result = new Uint8Array(header.byteLength + audioData.byteLength);
-  result.set(new Uint8Array(header), 0);
-  result.set(new Uint8Array(audioData), header.byteLength);
+  const result = new Uint8Array(4 + audioData.byteLength);
+  result.set(new Uint8Array(buffer), 0);
+  result.set(new Uint8Array(audioData), 4);
 
   return result.buffer;
 }
