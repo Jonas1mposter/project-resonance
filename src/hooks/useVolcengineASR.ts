@@ -264,11 +264,23 @@ export function useVolcengineASR({
       }
       cleanupAudioCapture();
 
-      // Give server time to send final result before disconnecting
-      setTimeout(() => {
-        clientRef.current?.disconnect();
-        clientRef.current = null;
-      }, 2000);
+      // Wait for final result or timeout before disconnecting
+      // Upstream proxy needs ~3s to connect + processing time
+      const maxWait = 8000;
+      const checkInterval = 200;
+      let waited = 0;
+
+      const waitForResult = setInterval(() => {
+        waited += checkInterval;
+        // Disconnect if we got a final result or timed out
+        if (finalText || waited >= maxWait) {
+          clearInterval(waitForResult);
+          if (clientRef.current) {
+            clientRef.current.disconnect();
+            clientRef.current = null;
+          }
+        }
+      }, checkInterval);
     }
   }, [mockMode, state, finalText, partialText, mockPhrases, cleanupAudioCapture]);
 
