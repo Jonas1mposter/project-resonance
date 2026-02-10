@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Mic, RotateCcw } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
-import { useVolcengineASR } from '@/hooks/useVolcengineASR';
+import { useStepfunASR } from '@/hooks/useStepfunASR';
 import AudioRecorderButton from '@/components/AudioRecorderButton';
 import ASRStreamingResult from '@/components/ASRStreamingResult';
 import RecognitionResult from '@/components/RecognitionResult';
@@ -45,82 +45,35 @@ export default function UsagePage({
   const [lastDuration, setLastDuration] = useState(0);
   const [selectedText, setSelectedText] = useState<string | null>(null);
 
-  // ASR hook
-  // Build proxy URL automatically using the Edge Function
-  const proxyWsUrl = useMemo(() => {
-    if (asrSettings.proxyUrl) return asrSettings.proxyUrl;
-    // Auto-construct from Supabase project URL
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    if (supabaseUrl) {
-      const wsUrl = supabaseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
-      const resourceId = asrSettings.resourceId || 'volc.bigasr.sauc.duration';
-      return `${wsUrl}/functions/v1/asr-proxy?resource_id=${encodeURIComponent(resourceId)}`;
-    }
-    return undefined;
-  }, [asrSettings.proxyUrl, asrSettings.resourceId]);
-
-  const asrConfig = useMemo(() => ({
-    appKey: asrSettings.appKey,
-    accessKey: asrSettings.accessKey,
-    resourceId: asrSettings.resourceId,
-    proxyUrl: proxyWsUrl,
-  }), [asrSettings.appKey, asrSettings.accessKey, asrSettings.resourceId, proxyWsUrl]);
-
+  // StepFun ASR hook
   const {
-    state: asrState,
-    partialText,
     finalText,
+    isProcessing,
     error: asrError,
-    startSession,
-    stopSession,
+    transcribe,
     reset: resetASR,
-    isRecognizing,
-  } = useVolcengineASR({
-    config: asrConfig,
-    mockMode: asrSettings.mockMode,
-  });
+  } = useStepfunASR();
 
-  // Determine which mode to use: ASR mode (when ASR settings available) or legacy mode
-  const useASRMode = true; // Always use ASR mode now
+  const useASRMode = true; // Always use ASR mode
 
   const handleStart = useCallback(async () => {
-    if (useASRMode) {
-      setRecognitionState('recording');
-      await startRecording();
-      await startSession();
-    } else {
-      setRecognitionState('recording');
-      await startRecording();
-    }
-  }, [useASRMode, startRecording, startSession]);
+    setRecognitionState('recording');
+    await startRecording();
+  }, [startRecording]);
 
   const handleStop = useCallback(async () => {
-    if (useASRMode) {
-      const result = await stopRecording();
-      if (result) {
-        setLastBlob(result.blob);
-        setLastDuration(result.duration);
-      }
-      stopSession();
+    const result = await stopRecording();
+    if (result) {
+      setLastBlob(result.blob);
+      setLastDuration(result.duration);
+      setRecognitionState('processing');
+      // Send to StepFun for transcription
+      await transcribe(result.blob);
       setRecognitionState('result');
     } else {
-      const result = await stopRecording();
-      if (result) {
-        setLastBlob(result.blob);
-        setLastDuration(result.duration);
-        setRecognitionState('processing');
-
-        setTimeout(() => {
-          const recognition = recognize();
-          setResults(recognition.results);
-          setIsUnknown(recognition.isUnknown);
-          setRecognitionState('result');
-        }, 600);
-      } else {
-        setRecognitionState('idle');
-      }
+      setRecognitionState('idle');
     }
-  }, [useASRMode, stopRecording, stopSession, recognize]);
+  }, [stopRecording, transcribe]);
 
   const handleSelect = useCallback(
     (phraseId: string) => {
@@ -267,20 +220,10 @@ export default function UsagePage({
       <div>
         <h2 id="usage-heading" className="text-2xl font-bold text-foreground">语音识别</h2>
         <p className="mt-1 text-muted-foreground">
-          {useASRMode ? (
-            <>
-              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium mr-2 ${
-                asrSettings.mockMode 
-                  ? 'bg-warning/15 text-warning-foreground' 
-                  : 'bg-success/15 text-success'
-              }`}>
-                {asrSettings.mockMode ? '模拟' : 'ASR'}
-              </span>
-              豆包大模型语音识别
-            </>
-          ) : (
-            <>已有 {trainedCount} 条短语可识别</>
-          )}
+          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium mr-2 bg-success/15 text-success">
+            ASR
+          </span>
+          阶跃星辰语音识别
         </p>
       </div>
 
@@ -311,23 +254,11 @@ export default function UsagePage({
             />
           </div>
 
-          {/* Show streaming partial text while recording */}
-          {useASRMode && isRecognizing && partialText && (
-            <div className="mt-6 pt-4 border-t border-border">
-              <ASRStreamingResult
-                partialText={partialText}
-                finalText=""
-                onSpeak={onSpeak}
-                onStop={onStop}
-                isSpeaking={isSpeaking}
-              />
-            </div>
-          )}
         </motion.div>
       )}
 
-      {/* Processing (legacy mode) */}
-      {recognitionState === 'processing' && !useASRMode && (
+      {/* Processing */}
+      {recognitionState === 'processing' && (
         <motion.div
           initial={isMotionReduced ? {} : { opacity: 0 }}
           animate={isMotionReduced ? {} : { opacity: 1 }}
@@ -345,7 +276,7 @@ export default function UsagePage({
         <>
           {useASRMode ? (
             <ASRStreamingResult
-              partialText={partialText}
+              partialText=""
               finalText={finalText}
               onSpeak={onSpeak}
               onStop={onStop}
@@ -374,7 +305,7 @@ export default function UsagePage({
       )}
 
       {/* No result from ASR */}
-      {recognitionState === 'result' && useASRMode && !finalText && !partialText && !isRecognizing && (
+      {recognitionState === 'result' && useASRMode && !finalText && (
         <motion.div
           initial={isMotionReduced ? {} : { opacity: 0 }}
           animate={isMotionReduced ? {} : { opacity: 1 }}

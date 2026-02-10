@@ -24,12 +24,23 @@ export interface RecognitionResult {
 }
 
 export interface ASRSettings {
+  /** ASR provider: 'stepfun' or 'volcengine' */
+  provider: 'stepfun' | 'volcengine';
   appKey: string;
   accessKey: string;
   resourceId: string;
   proxyUrl: string;
   mockMode: boolean;
 }
+
+export const DEFAULT_ASR_SETTINGS: ASRSettings = {
+  provider: 'stepfun',
+  appKey: '',
+  accessKey: '',
+  resourceId: 'volc.bigasr.sauc.duration',
+  proxyUrl: '',
+  mockMode: false,
+};
 
 export interface AppSettings {
   topK: number;
@@ -42,14 +53,6 @@ export interface AppSettings {
   ttsVoice: string;
   asr: ASRSettings;
 }
-
-export const DEFAULT_ASR_SETTINGS: ASRSettings = {
-  appKey: '',
-  accessKey: '',
-  resourceId: 'volc.bigasr.sauc.duration',
-  proxyUrl: '',
-  mockMode: false,
-};
 
 export const DEFAULT_SETTINGS: AppSettings = {
   topK: 3,
