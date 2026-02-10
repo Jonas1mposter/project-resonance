@@ -17,7 +17,8 @@
 
 // Protocol constants
 const PROTOCOL_VERSION = 0b0001;
-const HEADER_SIZE = 0b0001; // 1 unit = 4 bytes, always use this
+const HEADER_SIZE_1 = 0b0001; // 1 unit = 4 bytes (no sequence field)
+const HEADER_SIZE_2 = 0b0010; // 2 units = 8 bytes (with sequence field)
 
 // Message types
 const FULL_CLIENT_REQUEST = 0b0001;
@@ -64,10 +65,9 @@ export interface ASRUtterance {
 export type ASRState = 'idle' | 'connecting' | 'connected' | 'recognizing' | 'error';
 
 /**
- * Build a binary protocol header (header_size=1, 4 bytes header + 4 bytes payload_size)
- * Server auto-assigns sequence numbers. Use flags to indicate last message.
+ * Build a binary header WITHOUT sequence (header_size=1: 4+4=8 bytes)
  */
-function buildHeader(
+function buildHeaderNoSeq(
   messageType: number,
   messageTypeFlags: number,
   serializationMethod: number,
@@ -76,7 +76,7 @@ function buildHeader(
 ): ArrayBuffer {
   const buffer = new ArrayBuffer(8);
   const view = new DataView(buffer);
-  view.setUint8(0, (PROTOCOL_VERSION << 4) | HEADER_SIZE);
+  view.setUint8(0, (PROTOCOL_VERSION << 4) | HEADER_SIZE_1);
   view.setUint8(1, (messageType << 4) | messageTypeFlags);
   view.setUint8(2, (serializationMethod << 4) | compressionType);
   view.setUint8(3, 0x00);
@@ -85,8 +85,30 @@ function buildHeader(
 }
 
 /**
+ * Build a binary header WITH sequence (header_size=2: 4+4+4=12 bytes)
+ */
+function buildHeaderWithSeq(
+  messageType: number,
+  messageTypeFlags: number,
+  serializationMethod: number,
+  compressionType: number,
+  sequenceNumber: number,
+  payloadSize: number
+): ArrayBuffer {
+  const buffer = new ArrayBuffer(12);
+  const view = new DataView(buffer);
+  view.setUint8(0, (PROTOCOL_VERSION << 4) | HEADER_SIZE_2);
+  view.setUint8(1, (messageType << 4) | messageTypeFlags);
+  view.setUint8(2, (serializationMethod << 4) | compressionType);
+  view.setUint8(3, 0x00);
+  view.setInt32(4, sequenceNumber, false);
+  view.setUint32(8, payloadSize, false);
+  return buffer;
+}
+
+/**
  * Build the full_client_request message (first message with config)
- * Uses NO_SEQUENCE - server auto-assigns sequence 1
+ * Uses NO_SEQUENCE + header_size=1 (server auto-assigns seq=1)
  */
 function buildFullClientRequest(
   reqParams: Record<string, unknown>
@@ -94,7 +116,7 @@ function buildFullClientRequest(
   const jsonPayload = JSON.stringify(reqParams);
   const jsonBytes = new TextEncoder().encode(jsonPayload);
 
-  const header = buildHeader(
+  const header = buildHeaderNoSeq(
     FULL_CLIENT_REQUEST,
     NO_SEQUENCE,
     JSON_SERIALIZATION,
@@ -110,18 +132,20 @@ function buildFullClientRequest(
 }
 
 /**
- * Build an audio_only_request message
- * Server auto-assigns sequences. NEG_SEQUENCE flag marks the last chunk.
+ * Build an audio_only_request message WITH explicit sequence number.
+ * POS_SEQUENCE/NEG_SEQUENCE flags require header_size=2.
  */
 function buildAudioOnlyRequest(
   audioData: ArrayBuffer,
+  sequenceNumber: number,
   isLast: boolean
 ): ArrayBuffer {
-  const header = buildHeader(
+  const header = buildHeaderWithSeq(
     AUDIO_ONLY_REQUEST,
     isLast ? NEG_SEQUENCE : POS_SEQUENCE,
     NO_COMPRESSION,
     NO_COMPRESSION,
+    isLast ? -sequenceNumber : sequenceNumber,
     audioData.byteLength
   );
 
@@ -203,6 +227,7 @@ export class VolcengineASRClient {
   private config: ASRConfig;
   private callbacks: ASRCallbacks;
   private state: ASRState = 'idle';
+  private sequenceCounter: number = 2; // starts at 2 (full_client_request is auto seq=1)
 
   constructor(config: ASRConfig, callbacks: ASRCallbacks) {
     this.config = config;
@@ -228,6 +253,7 @@ export class VolcengineASRClient {
       this.disconnect();
     }
 
+    this.sequenceCounter = 2;
     this.setState('connecting');
 
     const wsUrl = this.config.proxyUrl 
@@ -310,11 +336,13 @@ export class VolcengineASRClient {
       return;
     }
 
-    const message = buildAudioOnlyRequest(audioData, isLast);
+    const seq = this.sequenceCounter;
+    const message = buildAudioOnlyRequest(audioData, seq, isLast);
     this.ws.send(message);
+    this.sequenceCounter++;
 
     if (isLast) {
-      console.log('[ASR] Sent last audio chunk');
+      console.log('[ASR] Sent last audio chunk (seq=' + (-seq) + ')');
     }
   }
 
@@ -392,14 +420,16 @@ export class VolcengineASRClient {
 
 // Export protocol utilities for testing
 export const protocol = {
-  buildHeader,
+  buildHeaderNoSeq,
+  buildHeaderWithSeq,
   buildFullClientRequest,
   buildAudioOnlyRequest,
   parseServerResponse,
   generateUUID,
   constants: {
     PROTOCOL_VERSION,
-    HEADER_SIZE,
+    HEADER_SIZE_1,
+    HEADER_SIZE_2,
     FULL_CLIENT_REQUEST,
     AUDIO_ONLY_REQUEST,
     SERVER_FULL_RESPONSE,
