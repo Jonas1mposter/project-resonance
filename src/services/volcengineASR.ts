@@ -3,16 +3,13 @@
  * 
  * Protocol: wss://openspeech.bytedance.com/api/v3/sauc/bigmodel
  * 
- * Binary message format (header_size=1, no sequence):
+ * Binary message format (header_size=1, all message types):
  *   Bytes 0-3:  header (version|hsize, type|flags, serial|compress, reserved)
  *   Bytes 4-7:  payload_size (uint32 big-endian)
  *   Bytes 8+:   payload
  *
- * Binary message format (header_size=2, with sequence):
- *   Bytes 0-3:  header
- *   Bytes 4-7:  sequence number (int32 big-endian)
- *   Bytes 8-11: payload_size (uint32 big-endian)
- *   Bytes 12+:  payload
+ * Server auto-assigns sequence numbers. POS_SEQUENCE/NEG_SEQUENCE flags
+ * indicate non-last/last audio chunk respectively.
  */
 
 // Protocol constants
@@ -133,20 +130,20 @@ function buildFullClientRequest(
 }
 
 /**
- * Build an audio_only_request message with explicit sequence number.
- * Uses header_size=2: [header 4B] [payload_size 4B] [sequence 4B] [audio...]
+ * Build an audio_only_request message.
+ * Uses header_size=1 (same as full_client_request). Server auto-assigns sequence.
+ * POS_SEQUENCE flag for non-last, NEG_SEQUENCE flag for last chunk.
  */
 function buildAudioOnlyRequest(
   audioData: ArrayBuffer,
-  sequenceNumber: number,
+  _sequenceNumber: number,
   isLast: boolean
 ): ArrayBuffer {
-  const header = buildHeaderWithSeq(
+  const header = buildHeaderNoSeq(
     AUDIO_ONLY_REQUEST,
     isLast ? NEG_SEQUENCE : POS_SEQUENCE,
     NO_COMPRESSION,
     NO_COMPRESSION,
-    isLast ? -sequenceNumber : sequenceNumber,
     audioData.byteLength
   );
 
