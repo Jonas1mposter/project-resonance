@@ -17,6 +17,23 @@ const corsHeaders = {
 
 const STEPFUN_TTS_URL = "https://api.stepfun.com/v1/audio/speech";
 
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2000;
+
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = MAX_RETRIES
+): Promise<Response> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const resp = await fetch(url, options);
+    if (resp.status !== 503 || attempt === retries) return resp;
+    console.log(`[stepfun-tts] 503 received, retry ${attempt}/${retries} in ${RETRY_DELAY_MS}ms...`);
+    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+  }
+  return fetch(url, options);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -63,7 +80,7 @@ Deno.serve(async (req) => {
 
     console.log("[stepfun-tts] Generating speech, voice:", ttsBody.voice, "text length:", text.length);
 
-    const response = await fetch(STEPFUN_TTS_URL, {
+    const response = await fetchWithRetry(STEPFUN_TTS_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
