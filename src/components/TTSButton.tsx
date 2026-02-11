@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 
 interface TTSButtonProps {
   text: string;
-  onSpeak: (text: string) => void;
+  onSpeak: (text: string) => void | Promise<void>;
   onStop: () => void;
   isSpeaking: boolean;
   className?: string;

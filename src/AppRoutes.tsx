@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { useAppData } from '@/hooks/useAppData';
 import { useTTS } from '@/hooks/useTTS';
+import { useStepfunTTS } from '@/hooks/useStepfunTTS';
 import { useMemo, useState, useEffect } from 'react';
 import UsagePage from './pages/UsagePage';
 import TrainingPage from './pages/TrainingPage';
@@ -54,6 +55,17 @@ export default function AppRoutes() {
     settings.ttsVoice
   );
 
+  const {
+    speak: stepfunSpeak,
+    stop: stepfunStop,
+    isSpeaking: stepfunIsSpeaking,
+    cloneVoice,
+    isCloning,
+    voiceId,
+    setVoiceId,
+    error: ttsError,
+  } = useStepfunTTS();
+
   const trainedCount = useMemo(
     () => phrases.filter((p) => p.enabled && p.recordingCount >= 2).length,
     [phrases]
@@ -79,10 +91,15 @@ export default function AppRoutes() {
             recognize={recognize}
             onFeedback={addRecording}
             trainedCount={trainedCount}
-            onSpeak={speak}
-            onStop={stop}
-            isSpeaking={isSpeaking}
+            onSpeak={stepfunSpeak}
+            onStop={stepfunStop}
+            isSpeaking={stepfunIsSpeaking}
             asrSettings={settings.asr}
+            voiceId={voiceId}
+            isCloning={isCloning}
+            ttsError={ttsError}
+            onCloneVoice={cloneVoice}
+            onClearVoice={() => setVoiceId(null)}
           />
         }
       />

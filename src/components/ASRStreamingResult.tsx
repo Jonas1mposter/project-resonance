@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 interface ASRStreamingResultProps {
   partialText: string;
   finalText: string;
-  onSpeak: (text: string) => void;
+  onSpeak: (text: string) => void | Promise<void>;
   onStop: () => void;
   isSpeaking: boolean;
 }
