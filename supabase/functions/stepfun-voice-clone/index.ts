@@ -19,6 +19,24 @@ const corsHeaders = {
 const STEPFUN_FILES_URL = "https://api.stepfun.com/v1/files";
 const STEPFUN_VOICES_URL = "https://api.stepfun.com/v1/audio/voices";
 
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2000;
+
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = MAX_RETRIES
+): Promise<Response> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const resp = await fetch(url, options);
+    if (resp.status !== 503 || attempt === retries) return resp;
+    console.log(`[voice-clone] 503 received, retry ${attempt}/${retries} in ${RETRY_DELAY_MS}ms...`);
+    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+  }
+  // unreachable but satisfies TS
+  return fetch(url, options);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -68,7 +86,7 @@ Deno.serve(async (req) => {
       uploadForm.append("purpose", "storage");
 
       console.log("[voice-clone] Uploading reference audio...");
-      const uploadResp = await fetch(STEPFUN_FILES_URL, {
+      const uploadResp = await fetchWithRetry(STEPFUN_FILES_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}` },
         body: uploadForm,
@@ -101,7 +119,7 @@ Deno.serve(async (req) => {
       }
 
       console.log("[voice-clone] Creating voice clone...");
-      const cloneResp = await fetch(STEPFUN_VOICES_URL, {
+      const cloneResp = await fetchWithRetry(STEPFUN_VOICES_URL, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -159,7 +177,7 @@ Deno.serve(async (req) => {
       if (text) cloneBody.text = text;
       if (sample_text) cloneBody.sample_text = sample_text;
 
-      const cloneResp = await fetch(STEPFUN_VOICES_URL, {
+      const cloneResp = await fetchWithRetry(STEPFUN_VOICES_URL, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
