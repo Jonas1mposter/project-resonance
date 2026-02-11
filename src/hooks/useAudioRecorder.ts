@@ -151,8 +151,8 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         setIsRecording(false);
         setDuration(0);
 
-        if (finalDuration < 0.3) {
-          setError('录音时间太短，请重试');
+        if (finalDuration < 10) {
+          setError('录音时间太短（需至少 10 秒），请重试');
           resolve(null);
         } else {
           try {
