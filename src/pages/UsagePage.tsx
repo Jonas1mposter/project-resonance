@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Mic, RotateCcw, Volume2, Check, Loader2 } from 'lucide-react';
+import { Mic, RotateCcw, Check, X } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useStepfunASR } from '@/hooks/useStepfunASR';
 import AudioRecorderButton from '@/components/AudioRecorderButton';
@@ -177,6 +177,16 @@ export default function UsagePage({
             <span className="inline-flex items-center gap-1 ml-2 rounded-full px-2 py-0.5 text-xs font-medium bg-success/15 text-success">
               <Check className="h-3 w-3" />
               音色已克隆
+              <button
+                onClick={() => {
+                  onClearVoice();
+                  toast.info('已清除克隆音色，下次录音将重新克隆');
+                }}
+                className="ml-1 text-muted-foreground hover:text-destructive transition-colors"
+                aria-label="清除克隆音色"
+              >
+                <X className="h-3 w-3" />
+              </button>
             </span>
           )}
         </p>
