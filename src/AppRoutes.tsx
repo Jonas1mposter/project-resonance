@@ -88,13 +88,9 @@ export default function AppRoutes() {
         path="/"
         element={
           <UsagePage
-            recognize={recognize}
-            onFeedback={addRecording}
-            trainedCount={trainedCount}
             onSpeak={stepfunSpeak}
             onStop={stepfunStop}
             isSpeaking={stepfunIsSpeaking}
-            asrSettings={settings.asr}
             voiceId={voiceId}
             isCloning={isCloning}
             ttsError={ttsError}
