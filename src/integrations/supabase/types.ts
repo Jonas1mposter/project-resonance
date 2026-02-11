@@ -14,7 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      dysarthria_recordings: {
+        Row: {
+          category: string | null
+          created_at: string
+          duration_ms: number | null
+          file_name: string
+          id: string
+          label: string | null
+          metadata: Json | null
+          speaker_id: string | null
+          storage_path: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          file_name: string
+          id?: string
+          label?: string | null
+          metadata?: Json | null
+          speaker_id?: string | null
+          storage_path: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          file_name?: string
+          id?: string
+          label?: string | null
+          metadata?: Json | null
+          speaker_id?: string | null
+          storage_path?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
