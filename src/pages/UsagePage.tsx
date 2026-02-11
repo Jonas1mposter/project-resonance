@@ -6,6 +6,7 @@ import { useStepfunASR } from '@/hooks/useStepfunASR';
 import AudioRecorderButton from '@/components/AudioRecorderButton';
 import ASRStreamingResult from '@/components/ASRStreamingResult';
 import RecognitionResult from '@/components/RecognitionResult';
+import VoiceClonePanel from '@/components/VoiceClonePanel';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAccessibility } from '@/hooks/useAccessibility';
 import { toast } from 'sonner';
@@ -18,10 +19,15 @@ interface UsagePageProps {
   };
   onFeedback: (phraseId: string, blob: Blob, duration: number) => void;
   trainedCount: number;
-  onSpeak: (text: string) => void;
+  onSpeak: (text: string) => Promise<void>;
   onStop: () => void;
   isSpeaking: boolean;
   asrSettings: ASRSettings;
+  voiceId: string | null;
+  isCloning: boolean;
+  ttsError: string | null;
+  onCloneVoice: (audioBlob: Blob, referenceText?: string) => Promise<string | null>;
+  onClearVoice: () => void;
 }
 
 export default function UsagePage({
@@ -32,6 +38,11 @@ export default function UsagePage({
   onStop,
   isSpeaking,
   asrSettings,
+  voiceId,
+  isCloning,
+  ttsError,
+  onCloneVoice,
+  onClearVoice,
 }: UsagePageProps) {
   const { isRecording, duration, startRecording, stopRecording, error: recError, audioLevel } = useAudioRecorder();
   const [recognitionState, setRecognitionState] = useState<
@@ -226,6 +237,18 @@ export default function UsagePage({
           阶跃星辰语音识别
         </p>
       </div>
+
+      {/* Voice Clone */}
+      <VoiceClonePanel
+        voiceId={voiceId}
+        isCloning={isCloning}
+        error={ttsError}
+        onClone={onCloneVoice}
+        onSpeak={onSpeak}
+        onClearVoice={onClearVoice}
+        isSpeaking={isSpeaking}
+        onStop={onStop}
+      />
 
       {/* Keyboard hint */}
       {recognitionState === 'idle' && (

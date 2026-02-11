@@ -7,7 +7,7 @@ interface RecognitionResultProps {
   results: Array<{ phraseId: string; text: string; confidence: number }>;
   isUnknown: boolean;
   onSelect: (phraseId: string) => void;
-  onSpeak: (text: string) => void;
+  onSpeak: (text: string) => void | Promise<void>;
   onStop: () => void;
   isSpeaking: boolean;
   onCopy: (text: string) => void;

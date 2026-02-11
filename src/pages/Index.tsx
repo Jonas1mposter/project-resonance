@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useAppData } from '@/hooks/useAppData';
-import { useTTS } from '@/hooks/useTTS';
+import { useStepfunTTS } from '@/hooks/useStepfunTTS';
 import UsagePage from './UsagePage';
 
 const Index = () => {
@@ -11,12 +11,16 @@ const Index = () => {
     recognize,
   } = useAppData();
 
-  const { speak, stop, isSpeaking } = useTTS(
-    settings.ttsRate,
-    settings.ttsVolume,
-    settings.ttsPitch,
-    settings.ttsVoice
-  );
+  const {
+    speak,
+    stop,
+    isSpeaking,
+    cloneVoice,
+    isCloning,
+    voiceId,
+    setVoiceId,
+    error: ttsError,
+  } = useStepfunTTS();
 
   const trainedCount = useMemo(
     () => phrases.filter((p) => p.enabled && p.recordingCount >= 2).length,
@@ -32,6 +36,11 @@ const Index = () => {
       onStop={stop}
       isSpeaking={isSpeaking}
       asrSettings={settings.asr}
+      voiceId={voiceId}
+      isCloning={isCloning}
+      ttsError={ttsError}
+      onCloneVoice={cloneVoice}
+      onClearVoice={() => setVoiceId(null)}
     />
   );
 };
