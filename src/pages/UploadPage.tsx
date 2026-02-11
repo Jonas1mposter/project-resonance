@@ -112,7 +112,7 @@ export default function UploadPage() {
     setFiles((prev) => prev.map((f, i) => (i === index ? { ...f, label } : f)));
   };
 
-  const CONCURRENCY = 5;
+  const CONCURRENCY = 15;
 
   const uploadOne = async (i: number) => {
     if (files[i].status === 'done') return;
