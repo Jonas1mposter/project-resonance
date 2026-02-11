@@ -94,9 +94,9 @@ Deno.serve(async (req) => {
       const cloneBody: Record<string, string> = {
         file_id: fileId,
         model: model,
-        sample_text: "你好，很高兴见到你。",
       };
-      if (referenceText) {
+      if (referenceText && referenceText.length >= 10) {
+        // Only send text for CER validation if it's long enough to be a real transcript
         cloneBody.text = referenceText;
       }
 
