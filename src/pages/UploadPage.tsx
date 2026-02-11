@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import JSZip from 'jszip';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,10 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, X, FileAudio, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, X, FileAudio, CheckCircle2, AlertCircle, Loader2, Archive } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CATEGORIES } from '@/types';
+
+const AUDIO_EXTENSIONS = /\.(wav|mp3|webm|ogg|m4a|flac|aac)$/i;
 
 interface FileEntry {
   file: File;
@@ -23,24 +26,75 @@ export default function UploadPage() {
   const [speakerId, setSpeakerId] = useState('');
   const [category, setCategory] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFilesSelected = useCallback((selected: FileList | null) => {
-    if (!selected) return;
-    const newEntries: FileEntry[] = Array.from(selected)
-      .filter((f) => f.type.startsWith('audio/') || f.name.match(/\.(wav|mp3|webm|ogg|m4a|flac|aac)$/i))
-      .map((f) => ({
-        file: f,
-        label: f.name.replace(/\.[^.]+$/, ''),
-        status: 'pending' as const,
-      }));
-
+  const addAudioFiles = useCallback((audioFiles: File[]) => {
+    const newEntries: FileEntry[] = audioFiles.map((f) => ({
+      file: f,
+      label: f.name.replace(/\.[^.]+$/, ''),
+      status: 'pending' as const,
+    }));
     if (newEntries.length === 0) {
-      toast.error('请选择音频文件（WAV、MP3、WebM 等）');
+      toast.error('未找到音频文件（WAV、MP3、WebM 等）');
       return;
     }
     setFiles((prev) => [...prev, ...newEntries]);
   }, []);
+
+  const extractZip = useCallback(async (zipFile: File) => {
+    setIsExtracting(true);
+    try {
+      const zip = await JSZip.loadAsync(zipFile);
+      const audioFiles: File[] = [];
+
+      const entries = Object.entries(zip.files).filter(
+        ([name, entry]) => !entry.dir && AUDIO_EXTENSIONS.test(name) && !name.startsWith('__MACOSX')
+      );
+
+      if (entries.length === 0) {
+        toast.error('ZIP 中未找到音频文件');
+        return;
+      }
+
+      for (const [name, entry] of entries) {
+        const blob = await entry.async('blob');
+        const fileName = name.split('/').pop() || name;
+        const ext = fileName.split('.').pop() || 'wav';
+        const mimeMap: Record<string, string> = {
+          wav: 'audio/wav', mp3: 'audio/mpeg', webm: 'audio/webm',
+          ogg: 'audio/ogg', m4a: 'audio/mp4', flac: 'audio/flac', aac: 'audio/aac',
+        };
+        audioFiles.push(new File([blob], fileName, { type: mimeMap[ext.toLowerCase()] || 'audio/wav' }));
+      }
+
+      addAudioFiles(audioFiles);
+      toast.success(`从 ZIP 中提取了 ${audioFiles.length} 个音频文件`);
+    } catch (err: any) {
+      toast.error('ZIP 解压失败：' + (err.message || '未知错误'));
+    } finally {
+      setIsExtracting(false);
+    }
+  }, [addAudioFiles]);
+
+  const handleFilesSelected = useCallback((selected: FileList | null) => {
+    if (!selected) return;
+    const arr = Array.from(selected);
+
+    // Check for ZIP files
+    const zips = arr.filter((f) => f.name.match(/\.zip$/i));
+    const audios = arr.filter((f) => f.type.startsWith('audio/') || AUDIO_EXTENSIONS.test(f.name));
+
+    if (zips.length > 0) {
+      zips.forEach((z) => extractZip(z));
+    }
+    if (audios.length > 0) {
+      addAudioFiles(audios);
+    }
+    if (zips.length === 0 && audios.length === 0) {
+      toast.error('请选择音频文件或 ZIP 压缩包');
+    }
+  }, [extractZip, addAudioFiles]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -155,18 +209,30 @@ export default function UploadPage() {
           onClick={() => inputRef.current?.click()}
           className="flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border bg-muted/30 p-10 transition-colors hover:border-primary/50 hover:bg-muted/50"
           role="button"
-          aria-label="点击或拖拽上传音频文件"
+          aria-label="点击或拖拽上传音频文件或 ZIP 压缩包"
         >
-          <Upload className="h-8 w-8 text-muted-foreground" />
-          <div className="text-center">
-            <p className="text-sm font-medium text-foreground">点击选择或拖拽音频文件</p>
-            <p className="text-xs text-muted-foreground mt-1">支持 WAV、MP3、WebM、OGG、M4A、FLAC</p>
-          </div>
+          {isExtracting ? (
+            <>
+              <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              <p className="text-sm font-medium text-foreground">正在解压 ZIP 文件...</p>
+            </>
+          ) : (
+            <>
+              <div className="flex gap-2">
+                <Upload className="h-8 w-8 text-muted-foreground" />
+                <Archive className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-medium text-foreground">点击选择或拖拽音频文件 / ZIP 压缩包</p>
+                <p className="text-xs text-muted-foreground mt-1">支持 WAV、MP3、WebM、OGG、M4A、FLAC 及 ZIP 压缩包</p>
+              </div>
+            </>
+          )}
           <input
             ref={inputRef}
             type="file"
             multiple
-            accept="audio/*,.wav,.mp3,.webm,.ogg,.m4a,.flac,.aac"
+            accept="audio/*,.wav,.mp3,.webm,.ogg,.m4a,.flac,.aac,.zip"
             className="hidden"
             onChange={(e) => handleFilesSelected(e.target.files)}
           />
