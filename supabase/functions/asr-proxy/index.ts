@@ -8,7 +8,7 @@
  * Query params (optional):
  *   - resource_id  (default: volc.bigasr.sauc.duration)
  */
-import WS from "npm:ws@8.18.0";
+import WS from "npm:ws@^8.18.0";
 
 const VOLCENGINE_ASR_URL = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel";
 
