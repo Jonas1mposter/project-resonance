@@ -129,7 +129,7 @@ export default function VoiceClonePanel({
       <div>
         <h3 className="font-semibold text-foreground">音色克隆</h3>
         <p className="text-xs text-muted-foreground mt-1">
-          录制或上传 5-10 秒清晰参考语音，系统将复刻您的音色
+          录制或上传 10 秒以上清晰参考语音（最长 5 分钟），系统将复刻您的音色
         </p>
       </div>
 
@@ -213,7 +213,7 @@ export default function VoiceClonePanel({
       {isRecording && (
         <p className="text-sm text-muted-foreground text-center">
           录音中... {duration.toFixed(1)}s
-          <span className="text-xs ml-1">（建议 5-10 秒）</span>
+          <span className="text-xs ml-1">（至少 10 秒）</span>
         </p>
       )}
 
