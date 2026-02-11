@@ -1,13 +1,13 @@
 /**
- * StepFun Voice Clone Edge Function
+ * Minimax Voice Clone Edge Function
  *
- * Two operations:
- * 1. Upload reference audio → get file_id
- * 2. Create voice clone from file_id → get voice_id
+ * Two-step process:
+ * 1. Upload reference audio → get file_id via Minimax Files API
+ * 2. Clone voice from file_id → get voice_id via Minimax Voice Clone API
  *
  * POST /stepfun-voice-clone
- *   Body: multipart/form-data with "audio" field (5-10s reference audio)
- *   OR JSON: { "file_id": "...", "model": "step-tts-mini", "text": "..." }
+ *   Body: multipart/form-data with "audio" field (10s-5min reference audio)
+ *   Optional: "text" field for reference text
  */
 
 const corsHeaders = {
@@ -16,8 +16,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const STEPFUN_FILES_URL = "https://api.stepfun.com/v1/files";
-const STEPFUN_VOICES_URL = "https://api.stepfun.com/v1/audio/voices";
+const MINIMAX_UPLOAD_URL = "https://api.minimax.chat/v1/files/upload";
+const MINIMAX_VOICE_CLONE_URL = "https://api.minimax.chat/v1/voice_clone";
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 2000;
@@ -33,8 +33,16 @@ async function fetchWithRetry(
     console.log(`[voice-clone] 503 received, retry ${attempt}/${retries} in ${RETRY_DELAY_MS}ms...`);
     await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
   }
-  // unreachable but satisfies TS
   return fetch(url, options);
+}
+
+function generateVoiceId(): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let id = "cloned_";
+  for (let i = 0; i < 12; i++) {
+    id += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return id;
 }
 
 Deno.serve(async (req) => {
@@ -49,10 +57,10 @@ Deno.serve(async (req) => {
     });
   }
 
-  const apiKey = Deno.env.get("STEPFUN_API_KEY");
+  const apiKey = Deno.env.get("MINIMAX_API_KEY");
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ error: "STEPFUN_API_KEY not configured" }),
+      JSON.stringify({ error: "MINIMAX_API_KEY not configured" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -63,135 +71,122 @@ Deno.serve(async (req) => {
   try {
     const contentType = req.headers.get("content-type") || "";
 
-    if (contentType.includes("multipart/form-data")) {
-      // Step 1: Upload audio file to StepFun, then clone voice
-      const formData = await req.formData();
-      const audioFile = formData.get("audio") as File | null;
-      const referenceText = formData.get("text") as string | null;
-      const model = (formData.get("model") as string) || "step-tts-mini";
-
-      if (!audioFile) {
-        return new Response(
-          JSON.stringify({ error: "Missing 'audio' field" }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      // Upload file to StepFun
-      const uploadForm = new FormData();
-      uploadForm.append("file", audioFile, audioFile.name || "reference.wav");
-      uploadForm.append("purpose", "storage");
-
-      console.log("[voice-clone] Uploading reference audio...");
-      const uploadResp = await fetchWithRetry(STEPFUN_FILES_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}` },
-        body: uploadForm,
-      });
-
-      if (!uploadResp.ok) {
-        const errText = await uploadResp.text();
-        console.error("[voice-clone] Upload failed:", uploadResp.status, errText);
-        return new Response(
-          JSON.stringify({ error: "Failed to upload audio", detail: errText }),
-          {
-            status: uploadResp.status,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      const uploadResult = await uploadResp.json();
-      const fileId = uploadResult.id;
-      console.log("[voice-clone] File uploaded, id:", fileId);
-
-      // Create voice clone
-      const cloneBody: Record<string, string> = {
-        file_id: fileId,
-        model: model,
-      };
-      if (referenceText && referenceText.length >= 10) {
-        // Only send text for CER validation if it's long enough to be a real transcript
-        cloneBody.text = referenceText;
-      }
-
-      console.log("[voice-clone] Creating voice clone...");
-      const cloneResp = await fetchWithRetry(STEPFUN_VOICES_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(cloneBody),
-      });
-
-      if (!cloneResp.ok) {
-        const errText = await cloneResp.text();
-        console.error("[voice-clone] Clone failed:", cloneResp.status, errText);
-        return new Response(
-          JSON.stringify({ error: "Failed to clone voice", detail: errText }),
-          {
-            status: cloneResp.status,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      const cloneResult = await cloneResp.json();
-      console.log("[voice-clone] Voice cloned, id:", cloneResult.id);
-
+    if (!contentType.includes("multipart/form-data")) {
       return new Response(
-        JSON.stringify({
-          voice_id: cloneResult.id,
-          file_id: fileId,
-          duplicated: cloneResult.duplicated || false,
-          sample_audio: cloneResult.sample_audio || null,
-        }),
+        JSON.stringify({ error: "Expected multipart/form-data" }),
         {
-          status: 200,
+          status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
-    } else {
-      // JSON request - clone from existing file_id
-      const body = await req.json();
-      const { file_id, model, text, sample_text } = body;
-
-      if (!file_id) {
-        return new Response(
-          JSON.stringify({ error: "Missing file_id" }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      const cloneBody: Record<string, string> = {
-        file_id,
-        model: model || "step-tts-mini",
-      };
-      if (text) cloneBody.text = text;
-      if (sample_text) cloneBody.sample_text = sample_text;
-
-      const cloneResp = await fetchWithRetry(STEPFUN_VOICES_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(cloneBody),
-      });
-
-      const result = await cloneResp.text();
-      return new Response(result, {
-        status: cloneResp.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
+
+    const formData = await req.formData();
+    const audioFile = formData.get("audio") as File | null;
+
+    if (!audioFile) {
+      return new Response(
+        JSON.stringify({ error: "Missing 'audio' field" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Step 1: Upload audio file to Minimax
+    const uploadForm = new FormData();
+    uploadForm.append("file", audioFile, audioFile.name || "reference.wav");
+    uploadForm.append("purpose", "voice_clone");
+
+    console.log("[voice-clone] Uploading reference audio to Minimax...");
+    const uploadResp = await fetchWithRetry(MINIMAX_UPLOAD_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: uploadForm,
+    });
+
+    if (!uploadResp.ok) {
+      const errText = await uploadResp.text();
+      console.error("[voice-clone] Upload failed:", uploadResp.status, errText);
+      return new Response(
+        JSON.stringify({ error: "Failed to upload audio", detail: errText }),
+        {
+          status: uploadResp.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const uploadResult = await uploadResp.json();
+    const fileId = uploadResult.file?.file_id || uploadResult.file_id;
+    if (!fileId) {
+      console.error("[voice-clone] No file_id in upload response:", JSON.stringify(uploadResult));
+      return new Response(
+        JSON.stringify({ error: "No file_id in upload response", detail: JSON.stringify(uploadResult) }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    console.log("[voice-clone] File uploaded, id:", fileId);
+
+    // Step 2: Clone voice
+    const customVoiceId = generateVoiceId();
+    const cloneBody: Record<string, unknown> = {
+      file_id: fileId,
+      voice_id: customVoiceId,
+    };
+
+    console.log("[voice-clone] Creating voice clone, voice_id:", customVoiceId);
+    const cloneResp = await fetchWithRetry(MINIMAX_VOICE_CLONE_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(cloneBody),
+    });
+
+    if (!cloneResp.ok) {
+      const errText = await cloneResp.text();
+      console.error("[voice-clone] Clone failed:", cloneResp.status, errText);
+      return new Response(
+        JSON.stringify({ error: "Failed to clone voice", detail: errText }),
+        {
+          status: cloneResp.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const cloneResult = await cloneResp.json();
+    console.log("[voice-clone] Clone result:", JSON.stringify(cloneResult));
+
+    // Check for API-level error
+    if (cloneResult.base_resp && cloneResult.base_resp.status_code !== 0) {
+      console.error("[voice-clone] Clone API error:", cloneResult.base_resp);
+      return new Response(
+        JSON.stringify({ error: "Voice clone failed", detail: cloneResult.base_resp.status_msg }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        voice_id: customVoiceId,
+        file_id: fileId,
+        demo_audio: cloneResult.demo_audio || null,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   } catch (err) {
     console.error("[voice-clone] Error:", err);
     return new Response(
