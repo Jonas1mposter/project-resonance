@@ -90,6 +90,44 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     }
   }, [startLevelMonitoring]);
 
+  const convertToWav = useCallback(async (webmBlob: Blob): Promise<Blob> => {
+    const arrayBuffer = await webmBlob.arrayBuffer();
+    const audioContext = new AudioContext();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    const numChannels = 1;
+    const sampleRate = audioBuffer.sampleRate;
+    const samples = audioBuffer.getChannelData(0);
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+
+    // WAV header
+    const writeString = (offset: number, str: string) => {
+      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+    };
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numChannels * 2, true);
+    view.setUint16(32, numChannels * 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, samples.length * 2, true);
+
+    for (let i = 0; i < samples.length; i++) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    }
+
+    await audioContext.close();
+    return new Blob([buffer], { type: 'audio/wav' });
+  }, []);
+
   const stopRecording = useCallback(async (): Promise<{ blob: Blob; duration: number } | null> => {
     return new Promise((resolve) => {
       const recorder = mediaRecorderRef.current;
@@ -98,9 +136,9 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         return;
       }
 
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         const finalDuration = (Date.now() - startTimeRef.current) / 1000;
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        const webmBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
 
         if (intervalRef.current) clearInterval(intervalRef.current);
         stopLevelMonitoring();
@@ -117,13 +155,19 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
           setError('录音时间太短，请重试');
           resolve(null);
         } else {
-          resolve({ blob, duration: finalDuration });
+          try {
+            const wavBlob = await convertToWav(webmBlob);
+            resolve({ blob: wavBlob, duration: finalDuration });
+          } catch (e) {
+            console.warn('WAV conversion failed, using webm:', e);
+            resolve({ blob: webmBlob, duration: finalDuration });
+          }
         }
       };
 
       recorder.stop();
     });
-  }, [stopLevelMonitoring]);
+  }, [stopLevelMonitoring, convertToWav]);
 
   return { isRecording, duration, startRecording, stopRecording, error, audioLevel };
 }
