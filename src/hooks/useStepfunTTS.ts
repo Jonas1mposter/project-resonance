@@ -63,8 +63,7 @@ export function useStepfunTTS(): UseStepfunTTSReturn {
         },
         body: JSON.stringify({
           text,
-          voice: voiceId || 'cixingnansheng',
-          model: 'step-tts-mini',
+          voice: voiceId || 'male-qn-qingse',
         }),
       });
 
