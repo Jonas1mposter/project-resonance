@@ -112,48 +112,57 @@ export default function UploadPage() {
     setFiles((prev) => prev.map((f, i) => (i === index ? { ...f, label } : f)));
   };
 
+  const CONCURRENCY = 5;
+
+  const uploadOne = async (i: number) => {
+    if (files[i].status === 'done') return;
+
+    setFiles((prev) =>
+      prev.map((f, idx) => (idx === i ? { ...f, status: 'uploading' } : f))
+    );
+
+    try {
+      const file = files[i].file;
+      const ext = file.name.split('.').pop() || 'wav';
+      const storagePath = `${speakerId || 'unknown'}/${Date.now()}_${i}.${ext}`;
+
+      const { error: storageError } = await supabase.storage
+        .from('dysarthria-audio')
+        .upload(storagePath, file);
+
+      if (storageError) throw storageError;
+
+      const { error: dbError } = await supabase.from('dysarthria_recordings').insert({
+        file_name: file.name,
+        storage_path: storagePath,
+        label: files[i].label || null,
+        category: category || null,
+        speaker_id: speakerId || null,
+      });
+
+      if (dbError) throw dbError;
+
+      setFiles((prev) =>
+        prev.map((f, idx) => (idx === i ? { ...f, status: 'done' } : f))
+      );
+    } catch (err: any) {
+      setFiles((prev) =>
+        prev.map((f, idx) =>
+          idx === i ? { ...f, status: 'error', error: err.message || '上传失败' } : f
+        )
+      );
+    }
+  };
+
   const uploadAll = async () => {
     if (files.length === 0) return;
     setIsUploading(true);
 
-    for (let i = 0; i < files.length; i++) {
-      if (files[i].status === 'done') continue;
-
-      setFiles((prev) =>
-        prev.map((f, idx) => (idx === i ? { ...f, status: 'uploading' } : f))
-      );
-
-      try {
-        const file = files[i].file;
-        const ext = file.name.split('.').pop() || 'wav';
-        const storagePath = `${speakerId || 'unknown'}/${Date.now()}_${i}.${ext}`;
-
-        const { error: storageError } = await supabase.storage
-          .from('dysarthria-audio')
-          .upload(storagePath, file);
-
-        if (storageError) throw storageError;
-
-        const { error: dbError } = await supabase.from('dysarthria_recordings').insert({
-          file_name: file.name,
-          storage_path: storagePath,
-          label: files[i].label || null,
-          category: category || null,
-          speaker_id: speakerId || null,
-        });
-
-        if (dbError) throw dbError;
-
-        setFiles((prev) =>
-          prev.map((f, idx) => (idx === i ? { ...f, status: 'done' } : f))
-        );
-      } catch (err: any) {
-        setFiles((prev) =>
-          prev.map((f, idx) =>
-            idx === i ? { ...f, status: 'error', error: err.message || '上传失败' } : f
-          )
-        );
-      }
+    const indices = files.map((_, i) => i).filter((i) => files[i].status !== 'done');
+    // Process in batches of CONCURRENCY
+    for (let start = 0; start < indices.length; start += CONCURRENCY) {
+      const batch = indices.slice(start, start + CONCURRENCY);
+      await Promise.all(batch.map((i) => uploadOne(i)));
     }
 
     setIsUploading(false);
