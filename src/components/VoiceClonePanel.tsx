@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Mic, MicOff, Volume2, Check, Loader2, AlertCircle, Trash2 } from 'lucide-react';
+import { Mic, MicOff, Volume2, Check, Loader2, AlertCircle, Trash2, Upload } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { toast } from 'sonner';
 
@@ -28,9 +28,12 @@ export default function VoiceClonePanel({
   const { isRecording, duration, startRecording, stopRecording, audioLevel } = useAudioRecorder();
   const [referenceText, setReferenceText] = useState('');
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleStartRecording = useCallback(async () => {
     setRecordedBlob(null);
+    setUploadedFileName(null);
     await startRecording();
   }, [startRecording]);
 
@@ -41,12 +44,36 @@ export default function VoiceClonePanel({
     }
   }, [stopRecording]);
 
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/x-wav', 'audio/webm', 'audio/ogg', 'audio/flac'];
+    if (!validTypes.some(t => file.type.startsWith(t.split('/')[0]))) {
+      toast.error('请上传音频文件（WAV、MP3 等格式）');
+      return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error('文件大小不能超过 20MB');
+      return;
+    }
+
+    setRecordedBlob(file);
+    setUploadedFileName(file.name);
+    toast.success(`已选择: ${file.name}`);
+
+    // Reset input so the same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, []);
+
   const handleClone = useCallback(async () => {
     if (!recordedBlob) return;
     const vid = await onClone(recordedBlob, referenceText || undefined);
     if (vid) {
       toast.success('音色复刻成功！');
       setRecordedBlob(null);
+      setUploadedFileName(null);
     }
   }, [recordedBlob, referenceText, onClone]);
 
@@ -102,7 +129,7 @@ export default function VoiceClonePanel({
       <div>
         <h3 className="font-semibold text-foreground">音色克隆</h3>
         <p className="text-xs text-muted-foreground mt-1">
-          录制 5-10 秒清晰参考语音，系统将复刻您的音色
+          录制或上传 5-10 秒清晰参考语音，系统将复刻您的音色
         </p>
       </div>
 
@@ -121,43 +148,80 @@ export default function VoiceClonePanel({
         />
       </div>
 
-      {/* Recording button */}
-      <div className="flex flex-col items-center gap-3">
-        <button
-          onClick={isRecording ? handleStopRecording : handleStartRecording}
-          disabled={isCloning}
-          className={`relative flex h-16 w-16 items-center justify-center rounded-full transition-all ${
-            isRecording
-              ? 'bg-destructive text-destructive-foreground animate-pulse'
-              : 'bg-primary text-primary-foreground hover:bg-primary/90'
-          } ${isCloning ? 'opacity-50 cursor-not-allowed' : ''}`}
-          aria-label={isRecording ? '停止录音' : '开始录音'}
-        >
-          {isRecording ? (
-            <MicOff className="h-6 w-6" />
-          ) : (
-            <Mic className="h-6 w-6" />
-          )}
-          {isRecording && (
-            <motion.div
-              className="absolute inset-0 rounded-full border-2 border-destructive"
-              animate={{ scale: [1, 1.2 + audioLevel * 0.3], opacity: [0.6, 0] }}
-              transition={{ duration: 1, repeat: Infinity }}
-            />
-          )}
-        </button>
+      {/* Recording + Upload buttons */}
+      <div className="flex items-center justify-center gap-4">
+        {/* Record button */}
+        <div className="flex flex-col items-center gap-2">
+          <button
+            onClick={isRecording ? handleStopRecording : handleStartRecording}
+            disabled={isCloning}
+            className={`relative flex h-16 w-16 items-center justify-center rounded-full transition-all ${
+              isRecording
+                ? 'bg-destructive text-destructive-foreground animate-pulse'
+                : 'bg-primary text-primary-foreground hover:bg-primary/90'
+            } ${isCloning ? 'opacity-50 cursor-not-allowed' : ''}`}
+            aria-label={isRecording ? '停止录音' : '录制参考音频'}
+          >
+            {isRecording ? (
+              <MicOff className="h-6 w-6" />
+            ) : (
+              <Mic className="h-6 w-6" />
+            )}
+            {isRecording && (
+              <motion.div
+                className="absolute inset-0 rounded-full border-2 border-destructive"
+                animate={{ scale: [1, 1.2 + audioLevel * 0.3], opacity: [0.6, 0] }}
+                transition={{ duration: 1, repeat: Infinity }}
+              />
+            )}
+          </button>
+          <span className="text-xs text-muted-foreground">录制</span>
+        </div>
 
-        {isRecording && (
-          <p className="text-sm text-muted-foreground">
-            录音中... {duration.toFixed(1)}s
-            <span className="text-xs ml-1">（建议 5-10 秒）</span>
-          </p>
-        )}
+        {/* Divider */}
+        <div className="flex flex-col items-center gap-1 text-muted-foreground">
+          <div className="h-6 w-px bg-border" />
+          <span className="text-xs">或</span>
+          <div className="h-6 w-px bg-border" />
+        </div>
 
-        {recordedBlob && !isRecording && (
-          <p className="text-sm text-success">✓ 已录制参考音频</p>
-        )}
+        {/* Upload button */}
+        <div className="flex flex-col items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="audio/*,.wav,.mp3,.flac,.ogg,.webm"
+            onChange={handleFileUpload}
+            className="hidden"
+            aria-label="上传参考音频文件"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isCloning || isRecording}
+            className={`flex h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-border bg-muted/30 text-muted-foreground transition-all hover:border-primary hover:text-primary hover:bg-primary/5 ${
+              isCloning || isRecording ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+            aria-label="上传参考音频"
+          >
+            <Upload className="h-6 w-6" />
+          </button>
+          <span className="text-xs text-muted-foreground">上传</span>
+        </div>
       </div>
+
+      {/* Status text */}
+      {isRecording && (
+        <p className="text-sm text-muted-foreground text-center">
+          录音中... {duration.toFixed(1)}s
+          <span className="text-xs ml-1">（建议 5-10 秒）</span>
+        </p>
+      )}
+
+      {recordedBlob && !isRecording && (
+        <p className="text-sm text-success text-center">
+          ✓ {uploadedFileName ? `已选择: ${uploadedFileName}` : '已录制参考音频'}
+        </p>
+      )}
 
       {/* Clone button */}
       {recordedBlob && !isRecording && (
