@@ -58,16 +58,13 @@ export default function Layout({ children }: LayoutProps) {
     <div className="flex min-h-screen flex-col bg-background">
       <SkipToContent />
 
-      {/* Safe area spacer for notch */}
-      <div className="bg-card/80 backdrop-blur-md" style={{ height: 'env(safe-area-inset-top, 0px)' }} />
-
       {/* Header */}
       <header
         className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md"
         role="banner"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <div className="container flex h-16 items-center justify-between px-4">
+        <div className="container flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary" aria-hidden="true">
               <Mic className="h-5 w-5 text-primary-foreground" />
