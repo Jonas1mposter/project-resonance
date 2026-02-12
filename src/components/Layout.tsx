@@ -55,13 +55,17 @@ export default function Layout({ children }: LayoutProps) {
     : { type: 'spring' as const, stiffness: 400, damping: 30 };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div className="flex min-h-screen flex-col bg-background">
       <SkipToContent />
+
+      {/* Safe area spacer for notch */}
+      <div className="bg-card/80 backdrop-blur-md" style={{ height: 'env(safe-area-inset-top, 0px)' }} />
 
       {/* Header */}
       <header
         className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md"
         role="banner"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="container flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-3">
