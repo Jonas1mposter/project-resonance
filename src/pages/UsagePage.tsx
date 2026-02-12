@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import type { ASRSettings } from '@/types';
 
 interface UsagePageProps {
-  onSpeak: (text: string) => Promise<void>;
+  onSpeak: (text: string, overrideVoice?: string) => Promise<void>;
   onStop: () => void;
   isSpeaking: boolean;
   voiceId: string | null;
@@ -72,18 +72,20 @@ export default function UsagePage({
     setLastTranscript(text);
 
     // Step 2: Clone voice if needed (duration >= 10s and no existing voiceId)
+    let speakVoice: string | undefined;
     if (!voiceId && recDuration >= 10) {
       setFlowState('cloning');
       const vid = await onCloneVoice(blob, text);
       if (vid) {
         toast.success('音色克隆成功');
+        speakVoice = vid;
       }
     }
 
-    // Step 3: Auto-speak the transcribed text
+    // Step 3: Auto-speak the transcribed text (pass cloned voice directly to avoid stale closure)
     setFlowState('speaking');
     try {
-      await onSpeak(text);
+      await onSpeak(text, speakVoice);
     } catch {
       // TTS error handled by parent
     }
