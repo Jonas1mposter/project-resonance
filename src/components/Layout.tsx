@@ -55,7 +55,7 @@ export default function Layout({ children }: LayoutProps) {
     : { type: 'spring' as const, stiffness: 400, damping: 30 };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col bg-background" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <SkipToContent />
 
       {/* Header */}
@@ -132,6 +132,7 @@ export default function Layout({ children }: LayoutProps) {
       {/* Mobile Bottom Nav */}
       <nav
         className="sticky bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur-md md:hidden"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         role="navigation"
         aria-label="移动端导航"
       >
