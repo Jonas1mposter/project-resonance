@@ -8,7 +8,7 @@ import TrainingPage from './pages/TrainingPage';
 import PhrasesPage from './pages/PhrasesPage';
 import SettingsPage from './pages/SettingsPage';
 import DataPage from './pages/DataPage';
-import UploadPage from './pages/UploadPage';
+
 import WelcomePage from './pages/WelcomePage';
 import NotFound from './pages/NotFound';
 
@@ -141,7 +141,7 @@ export default function AppRoutes() {
           />
         }
       />
-      <Route path="/upload" element={<UploadPage />} />
+      
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
