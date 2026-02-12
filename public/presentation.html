@@ -271,6 +271,34 @@
             align-self: center;
         }
 
+        .slide.demo-slide {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%) !important;
+            background-image: none !important;
+        }
+
+        .demo-slide .demo-card {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 1.5rem;
+            padding: 2.5rem 3rem;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s, border-color 0.3s;
+        }
+
+        .demo-slide .demo-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--secondary);
+        }
+
+        @keyframes pulse-arrow {
+            0%, 100% { opacity: 1; transform: translateY(0); }
+            50% { opacity: 0.5; transform: translateY(8px); }
+        }
+
+        .demo-slide .pulse-hint {
+            animation: pulse-arrow 2s ease-in-out infinite;
+        }
+
     </style>
 </head>
 <body>
@@ -344,22 +372,26 @@
         </div>
 
         <!-- Slide 4: 产品演示（过渡页） -->
-        <div class="slide" id="slide-4" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); background-image: none;">
+        <div class="slide demo-slide" id="slide-4">
             <div style="text-align: center; color: white;">
-                <div style="font-size: 5rem; margin-bottom: 2rem;">🎬</div>
-                <h1 style="color: white; font-size: 4rem;">产品演示</h1>
-                <p style="color: #94a3b8; font-size: 2rem; margin-top: 1rem;">Live Demo</p>
-                <div style="margin-top: 3rem; display: flex; justify-content: center; gap: 2rem;">
-                    <div style="background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); border-radius: 1rem; padding: 2rem 3rem;">
-                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🗣️</div>
-                        <p style="color: #e2e8f0; font-size: 1.2rem; margin: 0;">语音识别 → 文字转写</p>
+                <div style="font-size: 4rem; margin-bottom: 1.5rem; letter-spacing: 0.5rem;">🎙️ ✨</div>
+                <h1 style="color: white; font-size: 4.5rem; letter-spacing: 0.2rem;">产品演示</h1>
+                <p style="color: #94a3b8; font-size: 1.8rem; margin-top: 0.5rem; font-weight: 300;">Live Demo</p>
+                <div style="width: 120px; height: 4px; background: var(--secondary); margin: 2rem auto;"></div>
+                <div style="margin-top: 2.5rem; display: flex; justify-content: center; gap: 3rem;">
+                    <div class="demo-card">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">🗣️</div>
+                        <p style="color: white; font-size: 1.4rem; margin: 0; font-weight: 600;">语音识别</p>
+                        <p style="color: #94a3b8; font-size: 1.1rem; margin: 0.5rem 0 0;">模糊发音 → 精准文字</p>
                     </div>
-                    <div style="background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); border-radius: 1rem; padding: 2rem 3rem;">
-                        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🧬</div>
-                        <p style="color: #e2e8f0; font-size: 1.2rem; margin: 0;">声纹克隆 → 清晰复述</p>
+                    <div class="demo-card">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">🧬</div>
+                        <p style="color: white; font-size: 1.4rem; margin: 0; font-weight: 600;">声纹复述</p>
+                        <p style="color: #94a3b8; font-size: 1.1rem; margin: 0.5rem 0 0;">克隆音色 → 清晰表达</p>
                     </div>
                 </div>
-                <p style="color: var(--secondary); font-size: 1.4rem; margin-top: 3rem;">⬇ 请切换至产品进行现场演示 ⬇</p>
+                <p class="pulse-hint" style="color: var(--secondary); font-size: 1.6rem; margin-top: 3.5rem; font-weight: 600;">⬇ 请切换至产品进行现场演示 ⬇</p>
+            </div>
             </div>
         </div>
 
