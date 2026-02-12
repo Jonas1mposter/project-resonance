@@ -343,133 +343,8 @@
             </div>
         </div>
 
-        <!-- Slide 4: Why -->
+        <!-- Slide 4: 未来计划 -->
         <div class="slide" id="slide-4">
-            <h2>3. Why: 为什么需要它？</h2>
-            <p>不仅是为了患者，也是为了他们身边的人。</p>
-            
-            <div class="grid-2">
-                <div class="card" onclick="toggleReveal(this)">
-                    <h4>👨‍👩‍👧 亲人 / 照顾者 <span class="toggle-icon">▼</span></h4>
-                    <div class="reveal-content">
-                        <p><strong>功能：</strong>听懂真实想法，沟通零障碍，照顾更省心。</p>
-                        <p><strong>情感：</strong>心疼他的不容易，希望他不再封闭自己，快乐自信。</p>
-                    </div>
-                </div>
-                <div class="card" onclick="toggleReveal(this)">
-                    <h4>🌍 网友 / 陌生人 <span class="toggle-icon">▼</span></h4>
-                    <div class="reveal-content">
-                        <p><strong>功能：</strong>顺畅交流，不用反复猜测，避免尴尬。</p>
-                        <p><strong>情感：</strong>平等对待，不因说话问题而孤立或轻视 TA。</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Slide 5: How -->
-        <div class="slide" id="slide-5">
-            <h2>4. How: 解决方案</h2>
-            
-            <div class="grid-2">
-                <div>
-                    <h3>📱 产品形式</h3>
-                    <div class="card" onclick="toggleReveal(this)">
-                        <h4>移动端 + Web 双端 <span class="toggle-icon">▼</span></h4>
-                        <div class="reveal-content">
-                            <p><strong>Web 应用 + Capacitor 原生打包：</strong><br>一套代码同时支持浏览器访问和 Android/iOS 原生 APP。</p>
-                            <p style="color: #94a3b8; font-size: 1rem;">*基于 React + Vite + Tailwind 技术栈</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div>
-                    <h3>🤖 核心技术</h3>
-                    <div class="card orange" onclick="toggleReveal(this)">
-                        <h4>多模型协同方案 <span class="toggle-icon">▼</span></h4>
-                        <div class="reveal-content">
-                            <p><strong>语音识别：</strong>阶跃星辰 Step ASR，高精度构音转写。</p>
-                            <p><strong>声纹克隆：</strong>Minimax 音色克隆，10秒录音还原本人音色。</p>
-                            <p><strong>语音合成：</strong>Minimax TTS，以用户音色清晰复述。</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Slide 6: MVP -->
-        <div class="slide" id="slide-6">
-            <h2>5. What: MVP 核心功能</h2>
-            <div class="grid-3">
-                <div class="card" onclick="toggleReveal(this)">
-                    <div style="font-size: 3rem; margin-bottom: 1rem; text-align: center;">🗣️</div>
-                    <h4 style="justify-content: center;">词表录音训练</h4>
-                    <div class="click-hint" style="text-align: center;">点击展开</div>
-                    <div class="reveal-content">
-                        <p>预置 100 条日常短语，涵盖生理需求、紧急求助等 10 个类别。为每条短语录制 2~5 遍语音样本，系统学习用户发音模式。</p>
-                    </div>
-                </div>
-                <div class="card orange" onclick="toggleReveal(this)">
-                    <div style="font-size: 3rem; margin-bottom: 1rem; text-align: center;">🧬</div>
-                    <h4 style="justify-content: center;">识别 + 声纹复述</h4>
-                    <div class="click-hint" style="text-align: center;">点击展开</div>
-                    <div class="reveal-content">
-                        <p>录音一次，获取 Top-3 候选短语。选择正确结果后，以用户克隆音色清晰复述，或一键复制文字分享。</p>
-                    </div>
-                </div>
-                <div class="card" onclick="toggleReveal(this)">
-                    <div style="font-size: 3rem; margin-bottom: 1rem; text-align: center;">📊</div>
-                    <h4 style="justify-content: center;">科研数据采集</h4>
-                    <div class="click-hint" style="text-align: center;">点击展开</div>
-                    <div class="reveal-content">
-                        <p>内置病理语音数据采集模块，构建大规模构音障碍语料库，为后续模型微调与语音重建奠定数据基础。</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Slide 7: UI 设计 -->
-        <div class="slide" id="slide-7">
-            <h2>产品 UI 设计哲学</h2>
-            <div style="display: flex; align-items: center; justify-content: center; height: 60%;">
-                <div style="width: 300px; height: 500px; border: 4px solid #333; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; background: white; margin-right: 50px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
-                    <div style="height: 40px; background: #f1f5f9; border-radius: 5px;"></div>
-                    <div style="text-align: center; color: #cbd5e1; padding: 20px; display: flex; align-items: center; justify-content: center; flex: 1; flex-direction: column;">
-                        <span style="font-size: 2rem;">共鸣</span>
-                        <span style="font-size: 0.8rem; margin-top: 10px;">识别结果 · 候选短语</span>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div style="height: 80px; background: var(--secondary); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">录音</div>
-                        <div style="height: 80px; background: var(--primary); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">复述</div>
-                    </div>
-                </div>
-                
-                <div style="flex: 1;">
-                    <div class="card" onclick="toggleReveal(this)" style="margin-bottom: 1.5rem;">
-                        <h4>🌟 极简 UI 设计 <span class="toggle-icon">▼</span></h4>
-                        <div class="reveal-content">
-                            <p>仅保留录音、训练、使用、设置四大核心入口，降低认知负担。</p>
-                        </div>
-                    </div>
-                    
-                    <div class="card orange" onclick="toggleReveal(this)" style="margin-bottom: 1.5rem;">
-                        <h4>👆 无障碍适配 <span class="toggle-icon">▼</span></h4>
-                        <div class="reveal-content">
-                            <p>大触控区域（≥44px）、高对比度、键盘快捷键全覆盖，专为肢体操作不便的用户设计。支持刘海屏安全区域适配。</p>
-                        </div>
-                    </div>
-
-                    <div class="card" onclick="toggleReveal(this)">
-                        <h4>🛡️ 隐私与安全 <span class="toggle-icon">▼</span></h4>
-                        <div class="reveal-content">
-                            <p>API 密钥后端安全托管，语音数据端到端处理。无广告、无复杂设置，聚焦表达本身。</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Slide 8: 未来计划 -->
-        <div class="slide" id="slide-8">
             <h2>6. Next: 未来规划</h2>
             <p>让模型持续进化，同时推动科研与产品的双向驱动。</p>
 
@@ -492,7 +367,7 @@
         </div>
 
         <!-- Slide 9: 结束页 -->
-        <div class="slide" id="slide-9">
+        <div class="slide" id="slide-5">
             <div style="text-align: center;">
                 <h1 style="color: var(--secondary);">共鸣</h1>
                 <p class="sub-text" style="font-size: 1.6rem;">Project Resonance</p>
