@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 
 interface UseStepfunTTSReturn {
   /** Speak text using StepFun TTS with optional cloned voice */
-  speak: (text: string) => Promise<void>;
+  speak: (text: string, overrideVoice?: string) => Promise<void>;
   /** Stop current playback */
   stop: () => void;
   /** Whether audio is currently playing */
@@ -45,7 +45,7 @@ export function useStepfunTTS(): UseStepfunTTSReturn {
     } catch { /* ignore */ }
   }, []);
 
-  const speak = useCallback(async (text: string) => {
+  const speak = useCallback(async (text: string, overrideVoice?: string) => {
     setError(null);
     stop();
 
@@ -55,6 +55,8 @@ export function useStepfunTTS(): UseStepfunTTSReturn {
 
       setIsSpeaking(true);
 
+      const effectiveVoice = overrideVoice || voiceId || 'male-qn-qingse';
+
       const response = await fetch(`${supabaseUrl}/functions/v1/stepfun-tts`, {
         method: 'POST',
         headers: {
@@ -63,7 +65,7 @@ export function useStepfunTTS(): UseStepfunTTSReturn {
         },
         body: JSON.stringify({
           text,
-          voice: voiceId || 'male-qn-qingse',
+          voice: effectiveVoice,
         }),
       });
 
