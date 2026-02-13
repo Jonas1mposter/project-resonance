@@ -8,7 +8,7 @@ const UsagePage = lazy(() => import('./pages/UsagePage'));
 const TrainingPage = lazy(() => import('./pages/TrainingPage'));
 const PhrasesPage = lazy(() => import('./pages/PhrasesPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
-const DataPage = lazy(() => import('./pages/DataPage'));
+
 const WelcomePage = lazy(() => import('./pages/WelcomePage'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
@@ -133,19 +133,7 @@ export default function AppRoutes() {
             <SettingsPage settings={settings} onUpdate={setSettings} />
           }
         />
-        <Route
-          path="/data"
-          element={
-            <DataPage
-              phraseCount={phrases.length}
-              recordingCount={totalRecordings}
-              onExport={exportData}
-              onImport={importData}
-              onClearTraining={clearTrainingData}
-              onClearAll={clearAllData}
-            />
-          }
-        />
+        
         
         <Route path="*" element={<NotFound />} />
       </Routes>

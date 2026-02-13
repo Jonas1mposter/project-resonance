@@ -1,7 +1,7 @@
 import { ReactNode, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, BookOpen, List, Settings, Database, Keyboard } from 'lucide-react';
+import { Mic, BookOpen, List, Settings, Keyboard } from 'lucide-react';
 import SkipToContent from './SkipToContent';
 import KeyboardShortcutsPanel from './KeyboardShortcutsPanel';
 import { useKeyboardShortcuts, useShortcutHelpPanel } from '@/hooks/useKeyboardShortcuts';
@@ -17,7 +17,6 @@ const tabs = [
   { path: '/', label: '使用', icon: BookOpen, shortcutKey: '2' },
   { path: '/phrases', label: '词表', icon: List, shortcutKey: '3' },
   { path: '/settings', label: '设置', icon: Settings, shortcutKey: '4' },
-  { path: '/data', label: '数据', icon: Database, shortcutKey: '5' },
 ];
 
 
