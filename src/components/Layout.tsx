@@ -59,11 +59,11 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Header */}
       <header
-        className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md"
+        className="sticky top-0 z-50 border-b border-border/60 bg-card/90 backdrop-blur-xl"
         role="banner"
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <div className="container flex h-14 items-center justify-between px-4">
+        <div className="container flex h-12 md:h-14 items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary" aria-hidden="true">
               <Mic className="h-5 w-5 text-primary-foreground" />
@@ -122,7 +122,7 @@ export default function Layout({ children }: LayoutProps) {
             key={location.pathname}
             {...pageVariants}
             transition={isMotionReduced ? { duration: 0 } : { duration: 0.2 }}
-            className="container px-4 py-6"
+            className="container px-4 py-4 md:py-6 pb-2"
           >
             {children}
           </motion.div>
@@ -131,12 +131,12 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Mobile Bottom Nav */}
       <nav
-        className="sticky bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur-md md:hidden"
+        className="sticky bottom-0 z-50 border-t border-border/60 bg-card/95 backdrop-blur-xl md:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         role="navigation"
         aria-label="移动端导航"
       >
-        <div className="flex items-center justify-around py-1">
+        <div className="flex items-center justify-around py-1.5">
           {tabs.map((tab) => {
             const isActive = location.pathname === tab.path;
             return (
@@ -145,14 +145,21 @@ export default function Layout({ children }: LayoutProps) {
                 onClick={() => navigate(tab.path)}
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={tab.label}
-                className={`a11y-target flex flex-col items-center gap-1 rounded-lg px-3 py-1.5 text-xs transition-colors ${
+                className={`a11y-target relative flex flex-col items-center gap-0.5 rounded-xl px-4 py-2 text-xs font-medium transition-colors ${
                   isActive
                     ? 'text-primary'
-                    : 'text-muted-foreground'
+                    : 'text-muted-foreground active:text-foreground'
                 }`}
               >
-                <tab.icon className={`h-5 w-5 ${isActive ? 'text-primary' : ''}`} aria-hidden="true" />
-                <span aria-hidden="true">{tab.label}</span>
+                {isActive && (
+                  <motion.div
+                    layoutId="mobileActiveTab"
+                    className="absolute inset-0 rounded-xl bg-primary/10"
+                    transition={tabIndicatorTransition}
+                  />
+                )}
+                <tab.icon className={`relative z-10 h-5 w-5 ${isActive ? 'text-primary' : ''}`} aria-hidden="true" />
+                <span className="relative z-10" aria-hidden="true">{tab.label}</span>
               </button>
             );
           })}
