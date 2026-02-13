@@ -2,15 +2,15 @@ import { Routes, Route } from 'react-router-dom';
 import { useAppData } from '@/hooks/useAppData';
 import { useTTS } from '@/hooks/useTTS';
 import { useStepfunTTS } from '@/hooks/useStepfunTTS';
-import { useMemo, useState, useEffect } from 'react';
-import UsagePage from './pages/UsagePage';
-import TrainingPage from './pages/TrainingPage';
-import PhrasesPage from './pages/PhrasesPage';
-import SettingsPage from './pages/SettingsPage';
-import DataPage from './pages/DataPage';
+import { useMemo, useState, useEffect, lazy, Suspense } from 'react';
 
-import WelcomePage from './pages/WelcomePage';
-import NotFound from './pages/NotFound';
+const UsagePage = lazy(() => import('./pages/UsagePage'));
+const TrainingPage = lazy(() => import('./pages/TrainingPage'));
+const PhrasesPage = lazy(() => import('./pages/PhrasesPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const DataPage = lazy(() => import('./pages/DataPage'));
+const WelcomePage = lazy(() => import('./pages/WelcomePage'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 const ONBOARDING_KEY = 'resonance_onboarding_done';
 
@@ -79,70 +79,76 @@ export default function AppRoutes() {
   if (!welcomeChecked) return null;
 
   if (showWelcome) {
-    return <WelcomePage onComplete={handleOnboardingComplete} />;
+    return (
+      <Suspense fallback={<div className="flex items-center justify-center h-screen">加载中...</div>}>
+        <WelcomePage onComplete={handleOnboardingComplete} />
+      </Suspense>
+    );
   }
 
   return (
-    <Routes>
-      <Route
-        path="/"
-        element={
-          <UsagePage
-            onSpeak={stepfunSpeak}
-            onStop={stepfunStop}
-            isSpeaking={stepfunIsSpeaking}
-            voiceId={voiceId}
-            isCloning={isCloning}
-            ttsError={ttsError}
-            onCloneVoice={cloneVoice}
-            onClearVoice={() => setVoiceId(null)}
-          />
-        }
-      />
-      <Route
-        path="/training"
-        element={
-          <TrainingPage
-            phrases={phrases}
-            onAddRecording={addRecording}
-            onDeleteRecording={deleteRecording}
-          />
-        }
-      />
-      <Route
-        path="/phrases"
-        element={
-          <PhrasesPage
-            phrases={phrases}
-            onUpdate={updatePhrase}
-            onAdd={addPhrase}
-            onDelete={deletePhrase}
-            onExport={exportData}
-            onImport={importData}
-          />
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <SettingsPage settings={settings} onUpdate={setSettings} />
-        }
-      />
-      <Route
-        path="/data"
-        element={
-          <DataPage
-            phraseCount={phrases.length}
-            recordingCount={totalRecordings}
-            onExport={exportData}
-            onImport={importData}
-            onClearTraining={clearTrainingData}
-            onClearAll={clearAllData}
-          />
-        }
-      />
-      
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <Suspense fallback={<div className="flex items-center justify-center h-screen">加载中...</div>}>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <UsagePage
+              onSpeak={stepfunSpeak}
+              onStop={stepfunStop}
+              isSpeaking={stepfunIsSpeaking}
+              voiceId={voiceId}
+              isCloning={isCloning}
+              ttsError={ttsError}
+              onCloneVoice={cloneVoice}
+              onClearVoice={() => setVoiceId(null)}
+            />
+          }
+        />
+        <Route
+          path="/training"
+          element={
+            <TrainingPage
+              phrases={phrases}
+              onAddRecording={addRecording}
+              onDeleteRecording={deleteRecording}
+            />
+          }
+        />
+        <Route
+          path="/phrases"
+          element={
+            <PhrasesPage
+              phrases={phrases}
+              onUpdate={updatePhrase}
+              onAdd={addPhrase}
+              onDelete={deletePhrase}
+              onExport={exportData}
+              onImport={importData}
+            />
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <SettingsPage settings={settings} onUpdate={setSettings} />
+          }
+        />
+        <Route
+          path="/data"
+          element={
+            <DataPage
+              phraseCount={phrases.length}
+              recordingCount={totalRecordings}
+              onExport={exportData}
+              onImport={importData}
+              onClearTraining={clearTrainingData}
+              onClearAll={clearAllData}
+            />
+          }
+        />
+        
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
 }
