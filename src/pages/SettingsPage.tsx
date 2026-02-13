@@ -17,10 +17,10 @@ export default function SettingsPage({ settings, onUpdate }: SettingsPageProps) 
   };
 
   return (
-    <section className="max-w-lg mx-auto space-y-6" aria-labelledby="settings-heading">
+    <section className="max-w-lg mx-auto space-y-5" aria-labelledby="settings-heading">
       <div>
-        <h2 id="settings-heading" className="text-2xl font-bold text-foreground">设置</h2>
-        <p className="mt-1 text-muted-foreground">调整识别、语音与辅助功能参数</p>
+        <h2 id="settings-heading" className="text-xl md:text-2xl font-bold text-foreground">设置</h2>
+        <p className="mt-0.5 text-sm text-muted-foreground">调整识别、语音与辅助功能参数</p>
       </div>
 
       {/* Accessibility Settings — prominent placement like Apple */}

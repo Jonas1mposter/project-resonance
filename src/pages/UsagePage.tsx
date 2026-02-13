@@ -170,9 +170,9 @@ export default function UsagePage({
   const displayText = finalText || lastTranscript;
 
   return (
-    <section className="max-w-lg mx-auto space-y-6" aria-labelledby="usage-heading">
-      <div>
-        <h2 id="usage-heading" className="text-2xl font-bold text-foreground">语音识别</h2>
+    <section className="max-w-lg mx-auto space-y-5" aria-labelledby="usage-heading">
+      <div className="text-center md:text-left">
+        <h2 id="usage-heading" className="text-xl md:text-2xl font-bold text-foreground">语音识别</h2>
         <p className="mt-1 text-muted-foreground text-sm">
           录音 → 识别文字 → 克隆音色 → 朗读
           {voiceId && (
@@ -209,7 +209,7 @@ export default function UsagePage({
         <motion.div
           initial={isMotionReduced ? {} : { opacity: 0 }}
           animate={isMotionReduced ? {} : { opacity: 1 }}
-          className="rounded-2xl border border-border bg-card p-8"
+          className="rounded-2xl border border-border bg-card p-6 md:p-8 shadow-sm"
         >
           <div className="flex flex-col items-center">
             <AudioRecorderButton

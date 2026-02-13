@@ -65,29 +65,29 @@ export default function PhrasesPage({
   };
 
   return (
-    <section className="max-w-2xl mx-auto space-y-6" aria-labelledby="phrases-heading">
-      <div className="flex items-center justify-between">
+    <section className="max-w-2xl mx-auto space-y-5" aria-labelledby="phrases-heading">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 id="phrases-heading" className="text-2xl font-bold text-foreground">词表管理</h2>
-          <p className="mt-1 text-muted-foreground">共 {phrases.length} 条短语</p>
+          <h2 id="phrases-heading" className="text-xl md:text-2xl font-bold text-foreground">词表管理</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">共 {phrases.length} 条短语</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={onExport}
-            className="a11y-target inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+            className="a11y-target inline-flex items-center gap-1.5 rounded-xl border border-border px-3.5 py-2 text-sm text-foreground hover:bg-muted transition-colors"
             aria-label="导出词表"
           >
             <Download className="h-4 w-4" aria-hidden="true" />
             导出
           </button>
-          <label className="a11y-target inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer" tabIndex={0} role="button" aria-label="导入词表">
+          <label className="a11y-target inline-flex items-center gap-1.5 rounded-xl border border-border px-3.5 py-2 text-sm text-foreground hover:bg-muted transition-colors cursor-pointer" tabIndex={0} role="button" aria-label="导入词表">
             <Upload className="h-4 w-4" aria-hidden="true" />
             导入
             <input type="file" accept=".json" onChange={handleImportFile} className="hidden" aria-hidden="true" />
           </label>
           <button
             onClick={() => setShowAddForm(true)}
-            className="a11y-target inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            className="a11y-target inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
             aria-label="新增短语"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />

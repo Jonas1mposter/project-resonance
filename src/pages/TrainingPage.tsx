@@ -117,11 +117,11 @@ export default function TrainingPage({ phrases, onAddRecording, onDeleteRecordin
   const { isMotionReduced } = useAccessibility();
 
   return (
-    <section className="max-w-2xl mx-auto space-y-6" aria-labelledby="training-heading">
+    <section className="max-w-2xl mx-auto space-y-5" aria-labelledby="training-heading">
       {/* Header */}
       <div>
-        <h2 id="training-heading" className="text-2xl font-bold text-foreground">训练录音</h2>
-        <p className="mt-1 text-muted-foreground">
+        <h2 id="training-heading" className="text-xl md:text-2xl font-bold text-foreground">训练录音</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
           为每条短语录制至少 2 遍语音样本 · 按
           <kbd className="kbd-hint mx-1">↑↓</kbd>
           切换短语
@@ -129,25 +129,26 @@ export default function TrainingPage({ phrases, onAddRecording, onDeleteRecordin
       </div>
 
       {/* Progress */}
-      <div className="rounded-xl border border-border bg-card p-4">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium text-foreground">训练进度</span>
-          <span className="text-sm text-muted-foreground">
-            {stats.trained} / {stats.total} 条已达标
+          <span className="text-sm font-medium text-primary">
+            {stats.trained} / {stats.total}
           </span>
         </div>
-        <div className="h-3 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuenow={stats.trained} aria-valuemax={stats.total}>
+        <div className="h-2.5 rounded-full bg-muted overflow-hidden" role="progressbar" aria-valuenow={stats.trained} aria-valuemax={stats.total}>
           <motion.div
-            className="h-full rounded-full bg-success"
+            className="h-full rounded-full bg-gradient-to-r from-primary to-success"
             initial={{ width: 0 }}
             animate={{ width: `${stats.total > 0 ? (stats.trained / stats.total) * 100 : 0}%` }}
             transition={{ duration: 0.5 }}
           />
         </div>
+        <p className="mt-1.5 text-xs text-muted-foreground">{stats.trained} 条已达标</p>
       </div>
 
       {/* Search & Filter */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
@@ -155,14 +156,14 @@ export default function TrainingPage({ phrases, onAddRecording, onDeleteRecordin
             placeholder="搜索短语..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-input bg-card py-3 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full rounded-xl border border-input bg-card py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             aria-label="搜索短语"
           />
         </div>
         <select
           value={selectedCategory}
           onChange={(e) => setSelectedCategory(e.target.value)}
-          className="rounded-lg border border-input bg-card px-3 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          className="rounded-xl border border-input bg-card px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           aria-label="筛选分类"
         >
           <option value="全部">全部分类</option>
