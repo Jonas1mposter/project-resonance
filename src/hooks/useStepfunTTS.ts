@@ -115,7 +115,6 @@ export function useStepfunTTS(): UseStepfunTTSReturn {
 
       const formData = new FormData();
       formData.append('audio', audioBlob, 'reference.wav');
-      formData.append('model', 'speech-2.8-hd');
       if (referenceText) {
         formData.append('text', referenceText);
       }
