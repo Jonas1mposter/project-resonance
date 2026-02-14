@@ -57,17 +57,30 @@ export function useStepfunTTS(): UseStepfunTTSReturn {
 
       const effectiveVoice = overrideVoice || voiceId || 'cixingnansheng';
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/stepfun-tts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          text,
-          voice: effectiveVoice,
-        }),
-      });
+      const makeRequest = async (voice: string) => {
+        const resp = await fetch(`${supabaseUrl}/functions/v1/stepfun-tts`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text, voice }),
+        });
+        return resp;
+      };
+
+      let response = await makeRequest(effectiveVoice);
+
+      // If cloned voice is invalid, auto-clear and retry with default
+      if (!response.ok && effectiveVoice !== 'cixingnansheng') {
+        const errData = await response.json().catch(() => ({}));
+        const detail = errData.detail || errData.error || '';
+        if (detail.includes('voice_id_invalid') || detail.includes('does not exist')) {
+          console.warn('[TTS] Invalid voice_id, clearing and retrying with default');
+          setVoiceId(null);
+          response = await makeRequest('cixingnansheng');
+        }
+      }
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
