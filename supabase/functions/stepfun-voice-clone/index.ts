@@ -1,12 +1,12 @@
 /**
- * Minimax Voice Clone Edge Function
+ * StepFun Voice Clone Edge Function
  *
  * Two-step process:
- * 1. Upload reference audio → get file_id via Minimax Files API
- * 2. Clone voice from file_id → get voice_id via Minimax Voice Clone API
+ * 1. Upload reference audio → get file_id via StepFun Files API
+ * 2. Clone voice from file_id → get voice_id via StepFun Voice Clone API
  *
  * POST /stepfun-voice-clone
- *   Body: multipart/form-data with "audio" field (10s-5min reference audio)
+ *   Body: multipart/form-data with "audio" field (5-10s reference audio)
  *   Optional: "text" field for reference text
  */
 
@@ -16,34 +16,8 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const MINIMAX_UPLOAD_URL = "https://api.minimax.chat/v1/files/upload";
-const MINIMAX_VOICE_CLONE_URL = "https://api.minimax.chat/v1/voice_clone";
-
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 2000;
-
-async function fetchWithRetry(
-  url: string,
-  options: RequestInit,
-  retries = MAX_RETRIES
-): Promise<Response> {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    const resp = await fetch(url, options);
-    if (resp.status !== 503 || attempt === retries) return resp;
-    console.log(`[voice-clone] 503 received, retry ${attempt}/${retries} in ${RETRY_DELAY_MS}ms...`);
-    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-  }
-  return fetch(url, options);
-}
-
-function generateVoiceId(): string {
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let id = "cloned_";
-  for (let i = 0; i < 12; i++) {
-    id += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return id;
-}
+const STEPFUN_UPLOAD_URL = "https://api.stepfun.com/v1/files";
+const STEPFUN_VOICE_CLONE_URL = "https://api.stepfun.com/v1/audio/voices";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -57,10 +31,10 @@ Deno.serve(async (req) => {
     });
   }
 
-  const apiKey = Deno.env.get("MINIMAX_API_KEY");
+  const apiKey = Deno.env.get("STEPFUN_API_KEY");
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ error: "MINIMAX_API_KEY not configured" }),
+      JSON.stringify({ error: "STEPFUN_API_KEY not configured" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -83,6 +57,7 @@ Deno.serve(async (req) => {
 
     const formData = await req.formData();
     const audioFile = formData.get("audio") as File | null;
+    const referenceText = formData.get("text") as string | null;
 
     if (!audioFile) {
       return new Response(
@@ -94,13 +69,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Step 1: Upload audio file to Minimax
+    // Step 1: Upload audio file to StepFun (purpose=storage for voice clone)
     const uploadForm = new FormData();
     uploadForm.append("file", audioFile, audioFile.name || "reference.wav");
-    uploadForm.append("purpose", "voice_clone");
+    uploadForm.append("purpose", "storage");
 
-    console.log("[voice-clone] Uploading reference audio to Minimax...");
-    const uploadResp = await fetchWithRetry(MINIMAX_UPLOAD_URL, {
+    console.log("[voice-clone] Uploading reference audio to StepFun...");
+    const uploadResp = await fetch(STEPFUN_UPLOAD_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}` },
       body: uploadForm,
@@ -119,9 +94,9 @@ Deno.serve(async (req) => {
     }
 
     const uploadResult = await uploadResp.json();
-    const fileId = uploadResult.file?.file_id || uploadResult.file_id;
+    const fileId = uploadResult.id;
     if (!fileId) {
-      console.error("[voice-clone] No file_id in upload response:", JSON.stringify(uploadResult));
+      console.error("[voice-clone] No file id in upload response:", JSON.stringify(uploadResult));
       return new Response(
         JSON.stringify({ error: "No file_id in upload response", detail: JSON.stringify(uploadResult) }),
         {
@@ -132,15 +107,17 @@ Deno.serve(async (req) => {
     }
     console.log("[voice-clone] File uploaded, id:", fileId);
 
-    // Step 2: Clone voice
-    const customVoiceId = generateVoiceId();
+    // Step 2: Clone voice using StepFun API
     const cloneBody: Record<string, unknown> = {
       file_id: fileId,
-      voice_id: customVoiceId,
+      model: "step-tts-mini",
     };
+    if (referenceText) {
+      cloneBody.text = referenceText;
+    }
 
-    console.log("[voice-clone] Creating voice clone, voice_id:", customVoiceId);
-    const cloneResp = await fetchWithRetry(MINIMAX_VOICE_CLONE_URL, {
+    console.log("[voice-clone] Creating voice clone...");
+    const cloneResp = await fetch(STEPFUN_VOICE_CLONE_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -164,11 +141,11 @@ Deno.serve(async (req) => {
     const cloneResult = await cloneResp.json();
     console.log("[voice-clone] Clone result:", JSON.stringify(cloneResult));
 
-    // Check for API-level error
-    if (cloneResult.base_resp && cloneResult.base_resp.status_code !== 0) {
-      console.error("[voice-clone] Clone API error:", cloneResult.base_resp);
+    const voiceId = cloneResult.id;
+    if (!voiceId) {
+      console.error("[voice-clone] No voice id in clone response");
       return new Response(
-        JSON.stringify({ error: "Voice clone failed", detail: cloneResult.base_resp.status_msg }),
+        JSON.stringify({ error: "No voice_id in clone response", detail: JSON.stringify(cloneResult) }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -178,9 +155,9 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        voice_id: customVoiceId,
+        voice_id: voiceId,
         file_id: fileId,
-        demo_audio: cloneResult.demo_audio || null,
+        demo_audio: cloneResult.sample_audio || null,
       }),
       {
         status: 200,
