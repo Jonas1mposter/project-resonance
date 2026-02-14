@@ -55,7 +55,7 @@ export function useStepfunTTS(): UseStepfunTTSReturn {
 
       setIsSpeaking(true);
 
-      const effectiveVoice = overrideVoice || voiceId || 'male-qn-qingse';
+      const effectiveVoice = overrideVoice || voiceId || 'cixingnansheng';
 
       const response = await fetch(`${supabaseUrl}/functions/v1/stepfun-tts`, {
         method: 'POST',
