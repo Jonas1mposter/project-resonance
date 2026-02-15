@@ -1,10 +1,20 @@
 import { useState, useCallback, useRef } from 'react';
 
+interface RecordingResult {
+  /** Compressed webm blob — small, ideal for ASR upload */
+  webmBlob: Blob;
+  /** PCM WAV blob — needed by voice-cloning APIs */
+  wavBlob: Blob;
+  /** Alias for wavBlob (backward compat) */
+  blob: Blob;
+  duration: number;
+}
+
 interface UseAudioRecorderReturn {
   isRecording: boolean;
   duration: number;
   startRecording: () => Promise<void>;
-  stopRecording: () => Promise<{ blob: Blob; duration: number } | null>;
+  stopRecording: () => Promise<RecordingResult | null>;
   error: string | null;
   audioLevel: number;
 }
@@ -128,7 +138,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     return new Blob([buffer], { type: 'audio/wav' });
   }, []);
 
-  const stopRecording = useCallback(async (): Promise<{ blob: Blob; duration: number } | null> => {
+  const stopRecording = useCallback(async (): Promise<RecordingResult | null> => {
     return new Promise((resolve) => {
       const recorder = mediaRecorderRef.current;
       if (!recorder || recorder.state === 'inactive') {
@@ -155,13 +165,14 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
           setError('录音时间太短，请重试');
           resolve(null);
         } else {
+          let wavBlob: Blob;
           try {
-            const wavBlob = await convertToWav(webmBlob);
-            resolve({ blob: wavBlob, duration: finalDuration });
+            wavBlob = await convertToWav(webmBlob);
           } catch (e) {
-            console.warn('WAV conversion failed, using webm:', e);
-            resolve({ blob: webmBlob, duration: finalDuration });
+            console.warn('WAV conversion failed, using webm as fallback:', e);
+            wavBlob = webmBlob;
           }
+          resolve({ webmBlob, wavBlob, blob: wavBlob, duration: finalDuration });
         }
       };
 

@@ -52,17 +52,19 @@ export default function UsagePage({
   }, [startRecording]);
 
   const handleStop = useCallback(async () => {
+    // Immediately show processing state for instant feedback
+    setFlowState('processing');
+
     const result = await stopRecording();
     if (!result) {
       setFlowState('idle');
       return;
     }
 
-    const { blob, duration: recDuration } = result;
+    const { webmBlob, blob: wavBlob, duration: recDuration } = result;
 
-    // Step 1: ASR transcription
-    setFlowState('processing');
-    const text = await transcribe(blob);
+    // Step 1: ASR transcription — send compressed webm (50-80% smaller than WAV)
+    const text = await transcribe(webmBlob);
 
     if (!text) {
       setFlowState('result');
@@ -71,18 +73,18 @@ export default function UsagePage({
 
     setLastTranscript(text);
 
-    // Step 2: Clone voice if needed (duration >= 10s and no existing voiceId)
+    // Step 2: Clone voice if needed (use WAV for cloning quality)
     let speakVoice: string | undefined;
     if (!voiceId && recDuration >= 10) {
       setFlowState('cloning');
-      const vid = await onCloneVoice(blob, text);
+      const vid = await onCloneVoice(wavBlob, text);
       if (vid) {
         toast.success('音色克隆成功');
         speakVoice = vid;
       }
     }
 
-    // Step 3: Auto-speak the transcribed text (pass cloned voice directly to avoid stale closure)
+    // Step 3: Auto-speak the transcribed text
     setFlowState('speaking');
     try {
       await onSpeak(text, speakVoice);
@@ -236,18 +238,25 @@ export default function UsagePage({
       {/* Processing / Cloning / Speaking states */}
       {(flowState === 'processing' || flowState === 'cloning' || flowState === 'speaking') && (
         <motion.div
-          initial={isMotionReduced ? {} : { opacity: 0 }}
-          animate={isMotionReduced ? {} : { opacity: 1 }}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.15 }}
           className="rounded-2xl border border-border bg-card p-8 text-center space-y-3"
           role="status"
           aria-live="polite"
         >
-          <div className="mx-auto h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin" aria-hidden="true" />
+          <div className="relative mx-auto h-12 w-12">
+            <div className="absolute inset-0 rounded-full border-4 border-primary/20" aria-hidden="true" />
+            <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin" aria-hidden="true" />
+          </div>
           <p className="text-foreground font-medium">
             {flowState === 'processing' && '正在识别语音...'}
             {flowState === 'cloning' && '正在克隆音色...'}
             {flowState === 'speaking' && '正在朗读...'}
           </p>
+          {flowState === 'processing' && (
+            <p className="text-xs text-muted-foreground animate-pulse">正在上传压缩音频</p>
+          )}
           {flowState !== 'processing' && displayText && (
             <p className="text-sm text-muted-foreground">「{displayText}」</p>
           )}
