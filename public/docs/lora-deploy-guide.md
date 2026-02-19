@@ -7,6 +7,28 @@
 
 ---
 
+## ⚡ 一键部署（推荐）
+
+> 如果你不想手动执行每一步，直接运行一键脚本：
+
+```bash
+# 下载脚本
+wget -O deploy_4090.sh https://your-app-url/docs/deploy_4090.sh
+
+# 赋予执行权限并运行
+chmod +x deploy_4090.sh
+bash deploy_4090.sh
+```
+
+脚本会自动完成：安装依赖 → 检查 GPU → 训练模型（如有数据）→ 启动 FastAPI 服务
+
+> 💡 如果想**只启动推理服务**（已有权重，跳过训练）：
+> ```bash
+> SKIP_TRAINING=true bash deploy_4090.sh
+> ```
+
+---
+
 ## 📋 你需要准备什么？
 
 | 物品 | 说明 | 费用 |
