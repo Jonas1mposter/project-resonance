@@ -116,6 +116,7 @@ export function useStepfunTTS(): UseStepfunTTSReturn {
       audioRef.current = null;
     }
     setIsSpeaking(false);
+    setError(null);
   }, []);
 
   const cloneVoice = useCallback(async (audioBlob: Blob, referenceText?: string): Promise<string | null> => {
