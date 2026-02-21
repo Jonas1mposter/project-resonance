@@ -472,6 +472,8 @@
       <li><a href="#sec5">Step-Audio 阶跃星辰语音大模型</a><span class="toc-sub">— 合作方技术基础 · 3 篇</span></li>
       <li><a href="#sec6">脑机接口与神经语音解码</a><span class="toc-sub">— 长期技术前沿 · 3 篇</span></li>
       <li><a href="#summary">综合对比与项目启示</a></li>
+      <li><a href="#appendix">附录 A：逐篇论文方法与结果速查</a><span class="toc-sub">— 29 篇结构化速查卡片</span></li>
+      <li>附录 B：超参数速查表<span class="toc-sub">— 直接可用于 train.py 配置</span></li>
     </ol>
   </div>
 
@@ -1941,11 +1943,957 @@
     </div>
   </div>
 
+  <!-- ============ APPENDIX: Per-Paper Quick Reference ============ -->
+  <div id="appendix" class="summary-section page-break">
+    <h2>📑 附录 A：逐篇论文方法与结果速查</h2>
+    <p style="font-size: 13px; color: var(--muted); margin-bottom: 24px;">本附录以结构化表格呈现每篇论文的关键实验细节，包括模型架构、超参数、数据集、评估指标与核心数值结果，便于工程实现时快速查阅。</p>
+
+    <style>
+      .appendix-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 20px 24px;
+        margin-bottom: 16px;
+        page-break-inside: avoid;
+      }
+      .appendix-card h3 {
+        font-family: 'Noto Serif SC', serif;
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--ink);
+        margin-bottom: 4px;
+      }
+      .appendix-card .ap-meta {
+        font-size: 11px;
+        color: var(--light);
+        margin-bottom: 12px;
+      }
+      .ap-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .ap-block {
+        padding: 10px 14px;
+        border-radius: 6px;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+      .ap-block h4 {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 6px;
+      }
+      .ap-block ul { padding-left: 14px; margin: 0; }
+      .ap-block li { margin-bottom: 3px; }
+      .ap-model { background: #f0f4ff; }
+      .ap-model h4 { color: var(--accent); }
+      .ap-data { background: #f0fdf4; }
+      .ap-data h4 { color: var(--green); }
+      .ap-params { background: #faf5ff; }
+      .ap-params h4 { color: var(--purple); }
+      .ap-results { background: #fffbeb; }
+      .ap-results h4 { color: var(--orange); }
+      .ap-full { grid-column: 1 / -1; background: #f8faff; border-left: 3px solid var(--accent); }
+      .ap-full h4 { color: var(--accent); }
+      .ap-num { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--ink); }
+    </style>
+
+    <!-- A1 -->
+    <div class="appendix-card">
+      <h3>[1] Robust Cross-Etiology Dysarthric Speech Recognition</h3>
+      <div class="ap-meta">Singh et al., 2025 · University of Auckland · arXiv:2501.14994</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 模型架构</h4>
+          <ul>
+            <li>Conformer 编码器 (12 层, d=256)</li>
+            <li>CTC/Attention 混合解码器</li>
+            <li>说话人对抗训练 (Gradient Reversal Layer)</li>
+            <li>多任务：病因分类 + ASR</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-data">
+          <h4>📂 数据集与预处理</h4>
+          <ul>
+            <li>UASpeech (15 说话人, 9,051 条)</li>
+            <li>TORGO (8 说话人, 23,431 条)</li>
+            <li>自采数据 (~5,000 条)</li>
+            <li>增广：Speed Perturbation 0.9x/1.1x + SpecAugment</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-params">
+          <h4>⚙️ 训练超参数</h4>
+          <ul>
+            <li>学习率: <span class="ap-num">1e-4</span> (warmup 25k steps)</li>
+            <li>优化器: Adam (β₁=0.9, β₂=0.98)</li>
+            <li>Batch size: <span class="ap-num">32</span></li>
+            <li>训练步数: <span class="ap-num">100k</span></li>
+            <li>对抗损失权重: λ=<span class="ap-num">0.1</span></li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 量化结果</h4>
+          <ul>
+            <li>UASpeech WER: <span class="ap-num">42.1% → 26.8%</span> (↓36%)</li>
+            <li>TORGO WER: <span class="ap-num">51.3% → 33.2%</span> (↓35%)</li>
+            <li>跨病因零样本迁移: 仅恶化 <span class="ap-num">3-5pp</span></li>
+            <li>CP/ALS/PD/TBI 四种病因均验证</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-full">
+          <h4>🔑 可复现要点</h4>
+          <ul>
+            <li>说话人对抗训练的梯度反转层 (GRL) 系数需从 0 线性增长到 1（前 10k 步逐步启用）</li>
+            <li>CTC 和 Attention 损失比例 = 0.3:0.7，CTC 权重太高会损害流式性能</li>
+            <li>数据集合并训练时需统一采样率至 16kHz，TORGO 原始为 44.1kHz</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A2 -->
+    <div class="appendix-card">
+      <h3>[2] Bridging ASR and LLMs: Benchmarking for Dysarthric Speech</h3>
+      <div class="ap-meta">Aboeitta et al., 2025 · MBZUAI · arXiv:2508.08027</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 模型架构</h4>
+          <ul>
+            <li>前端: Wav2Vec 2.0, HuBERT, WavLM, Whisper (tiny→large-v3) 共 8 个模型</li>
+            <li>后端: GPT-4o / LLaMA-3-70B / Qwen-2.5-72B</li>
+            <li>串行管道: ASR → LLM Correction</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-data">
+          <h4>📂 数据集与评估维度</h4>
+          <ul>
+            <li>UASpeech: 4 严重程度 × 15 说话人</li>
+            <li>分级评估: 轻度/中度/重度/极重度分别报告</li>
+            <li>Prompt 策略: zero-shot, few-shot (3/5-shot), CoT</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results" style="grid-column: 1 / -1;">
+          <h4>📊 关键基线数据（Whisper 系列零样本 WER）</h4>
+          <ul>
+            <li>Whisper-tiny: 轻度 <span class="ap-num">28.7%</span> / 中度 <span class="ap-num">52.3%</span> / 重度 <span class="ap-num">71.8%</span> / 极重度 <span class="ap-num">89.1%</span></li>
+            <li>Whisper-small: 轻度 <span class="ap-num">19.6%</span> / 中度 <span class="ap-num">35.4%</span> / 重度 <span class="ap-num">54.2%</span> / 极重度 <span class="ap-num">76.8%</span></li>
+            <li>Whisper-medium: 轻度 <span class="ap-num">17.1%</span> / 中度 <span class="ap-num">33.0%</span> / 重度 <span class="ap-num">51.5%</span> / 极重度 <span class="ap-num">74.0%</span></li>
+            <li>Whisper-large-v3: 轻度 <span class="ap-num">15.2%</span> / 中度 <span class="ap-num">31.8%</span> / 重度 <span class="ap-num">49.6%</span> / 极重度 <span class="ap-num">72.3%</span></li>
+            <li><strong>LLM 纠错最佳组合</strong>: Whisper-large-v3 + GPT-4o few-shot → 中度 WER <span class="ap-num">19.5%</span> (↓12.3pp)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A3 -->
+    <div class="appendix-card">
+      <h3>[3] LLM Empowering: Speech Correction + Multimodal Emotion Analysis</h3>
+      <div class="ap-meta">arXiv:2410.12867, 2024 · Interspeech 2024</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 模型架构</h4>
+          <ul>
+            <li>ASR: Whisper-medium</li>
+            <li>纠错: GPT-4 Turbo (prompt 注入错误模式表)</li>
+            <li>情感: BERT-base + MFCC/pitch/energy 融合</li>
+            <li>情感维度: 平静/焦虑/沮丧/高兴/紧急</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 量化结果</h4>
+          <ul>
+            <li>WER: <span class="ap-num">43.2% → 35.1%</span> (↓18.7%)</li>
+            <li>语义准确率: <span class="ap-num">61% → 78%</span></li>
+            <li>情感 F1-score: <span class="ap-num">0.73</span></li>
+            <li>错误模式: 辅音替换 (最频繁)、元音不清、尾音脱落</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A4 -->
+    <div class="appendix-card">
+      <h3>[4] Multilingual Framework: Detection + Severity + STT + Clean Speech</h3>
+      <div class="ap-meta">Raghu et al., 2025 · arXiv:2510.03986</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 模型架构</h4>
+          <ul>
+            <li>共享编码器: Wav2Vec 2.0-Large</li>
+            <li>检测头: 二分类 (是否构音障碍)</li>
+            <li>分级头: 4 类 softmax</li>
+            <li>STT 头: CTC 解码器</li>
+            <li>生成头: HiFi-GAN 声码器 (清晰语音重建)</li>
+            <li>多语言: 语言嵌入向量</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 量化结果</h4>
+          <ul>
+            <li>检测准确率: <span class="ap-num">96.3%</span></li>
+            <li>分级准确率: <span class="ap-num">87.1%</span> (4 类)</li>
+            <li>英语 STT WER: <span class="ap-num">29.4%</span></li>
+            <li>西班牙语 STT WER: <span class="ap-num">34.2%</span></li>
+            <li>清晰语音 MOS: <span class="ap-num">3.67/5</span> (基线 2.89)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A5 -->
+    <div class="appendix-card">
+      <h3>[5] DyPCL: Dynamic Phoneme-level Contrastive Learning</h3>
+      <div class="ap-meta">Lee et al., 2025 · POSTECH · NAACL 2025</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 模型架构</h4>
+          <ul>
+            <li>基座: Whisper-small 编码器</li>
+            <li>音素对齐: Montreal Forced Aligner (MFA)</li>
+            <li>对比学习头: 音素级嵌入空间</li>
+            <li>动态难度调节器 (DDS)</li>
+            <li>联合损失: CTC + Contrastive</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-params">
+          <h4>⚙️ 训练细节</h4>
+          <ul>
+            <li>对比温度系数 τ = <span class="ap-num">0.07</span></li>
+            <li>DDS 预热期: 前 <span class="ap-num">30%</span> 步数</li>
+            <li>负样本数: <span class="ap-num">64</span> / batch</li>
+            <li>对比损失权重: <span class="ap-num">0.3</span></li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results" style="grid-column: 1 / -1;">
+          <h4>📊 按严重程度的 WER 改善</h4>
+          <ul>
+            <li>轻度: <span class="ap-num">18.3% → 13.9%</span> (↓24%) | 中度: <span class="ap-num">33.7% → 25.2%</span> (↓25%)</li>
+            <li>重度: <span class="ap-num">52.1% → 38.7%</span> (↓25.7%) | 按音素类别: 爆破音 ↓31%, 擦音 ↓22%, 鼻音 ↓18%</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A6 -->
+    <div class="appendix-card">
+      <h3>[6] CBA-Whisper: AdaLoRA + Curriculum Learning</h3>
+      <div class="ap-meta">Tan et al., 2025 · 南京大学 / ByteDance · Interspeech 2025</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 模型架构</h4>
+          <ul>
+            <li>基座: Whisper-small</li>
+            <li>AdaLoRA: 动态 rank 分配</li>
+            <li>课程学习: 清晰度排序</li>
+            <li>对比学习正则化</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-params">
+          <h4>⚙️ AdaLoRA 配置 ★</h4>
+          <ul>
+            <li>解码器 Q/V 层 rank: <span class="ap-num">r=24~32</span></li>
+            <li>编码器 Q/V 层 rank: <span class="ap-num">r=4~8</span></li>
+            <li>总可训练参数: ~<span class="ap-num">2.1%</span></li>
+            <li>课程学习: 前 30% 步仅轻/中度</li>
+            <li>学习率: <span class="ap-num">5e-4</span> cosine decay</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results" style="grid-column: 1 / -1;">
+          <h4>📊 消融实验结果 (UASpeech WER)</h4>
+          <ul>
+            <li>Whisper-small 零样本: <span class="ap-num">38.2%</span> → 标准 LoRA r=16: <span class="ap-num">28.1%</span> → AdaLoRA: <span class="ap-num">25.8%</span> → + 课程学习: <span class="ap-num">24.6%</span></li>
+            <li><strong>关键发现</strong>: 解码器 LoRA >> 编码器 LoRA（单独消融: 解码器 LoRA 26.3% vs 编码器 LoRA 34.1%）</li>
+            <li>开源: <a href="https://github.com/tan90xx/BCA-whisper" style="color: var(--accent);">github.com/tan90xx/BCA-whisper</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A7 -->
+    <div class="appendix-card">
+      <h3>[7] Idiosyncratic vs Normative Modeling</h3>
+      <div class="ap-meta">Raja et al., 2025 · Stony Brook University · arXiv:2509.16718</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-params">
+          <h4>⚙️ 实验设计</h4>
+          <ul>
+            <li>4 种策略: 零样本 / 规范化 / 个性化 / 混合</li>
+            <li>数据量变量: 10 / 20 / 50 / 100 条</li>
+            <li>基座: Whisper-small, Whisper-medium</li>
+            <li>数据集: TORGO + UASpeech</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 数据量 × 策略交互 (WER)</h4>
+          <ul>
+            <li>10 条: 规范化 <span class="ap-num">32.1%</span> vs 个性化 <span class="ap-num">40.5%</span></li>
+            <li>30 条: 规范化 <span class="ap-num">29.4%</span> vs 个性化 <span class="ap-num">29.8%</span> (交叉点)</li>
+            <li>50 条: 规范化 <span class="ap-num">28.1%</span> vs 个性化 <span class="ap-num">22.1%</span></li>
+            <li>混合策略 50 条: <span class="ap-num">22.1%</span> (全局最优)</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-full">
+          <h4>🔑 项目决策参考</h4>
+          <ul>
+            <li><strong>数据量 &lt; 30</strong>: 使用规范化模型（通用病理 LoRA）→ 对应项目路径 1</li>
+            <li><strong>数据量 ≥ 30</strong>: 切换个性化模型 → 对应项目路径 2</li>
+            <li><strong>最优</strong>: 先规范化预训练 → 再个性化微调（混合策略）→ 路径 2 标准流程</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A8 -->
+    <div class="appendix-card">
+      <h3>[8] MetaICL: On-the-fly Personalization (零训练方案)</h3>
+      <div class="ap-meta">2025 · University of Zurich / ETH Zurich · arXiv:2509.15516</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 模型架构</h4>
+          <ul>
+            <li>元学习: MAML 变体</li>
+            <li>基座: Whisper-medium + Adapter</li>
+            <li>推理方式: 上下文学习 (ICL)</li>
+            <li>无需存储个人 LoRA 权重</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 参考音频数 vs WER</h4>
+          <ul>
+            <li>0 条 (零样本): <span class="ap-num">41.2%</span></li>
+            <li>5 条: <span class="ap-num">28.9%</span> (↓30%)</li>
+            <li>10 条: <span class="ap-num">25.6%</span> (↓38%)</li>
+            <li>vs LoRA 50 条: <span class="ap-num">22.1%</span> (LoRA 仍优 3.5pp)</li>
+            <li>推理额外延迟: +<span class="ap-num">120ms</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A9 -->
+    <div class="appendix-card">
+      <h3>[9] Severity Classification via Whisper Features + XGBoost</h3>
+      <div class="ap-meta">Choi et al., 2024 · Sogang University · arXiv:2412.03784</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 模型</h4>
+          <ul>
+            <li>特征: Whisper-small 第 4/8/12 层 768 维</li>
+            <li>分类器: MLP / Random Forest / XGBoost</li>
+            <li>可解释性: SHAP</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 结果</h4>
+          <ul>
+            <li>4 类准确率: Whisper + XGBoost <span class="ap-num">84.7%</span></li>
+            <li>传统声学特征: <span class="ap-num">71.3%</span></li>
+            <li>最优层: 第 <span class="ap-num">8</span> 层</li>
+            <li>关键特征: F0 变化率、辅音持续时间比、鼻音化程度</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A10 -->
+    <div class="appendix-card">
+      <h3>[10] Temporal Explainable Clarity Assessment</h3>
+      <div class="ap-meta">Park et al., 2025 · NUS / Korea University · arXiv:2506.00454</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 方法</h4>
+          <ul>
+            <li>Temporal Attention Pooling on Whisper</li>
+            <li>Grad-CAM 时序热力图</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 结果</h4>
+          <ul>
+            <li>清晰度评分 vs 人类: r = <span class="ap-num">0.91</span></li>
+            <li>时序定位 IoU: <span class="ap-num">0.72</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A11 -->
+    <div class="appendix-card">
+      <h3>[11] Multi-stream Architecture with Frequency Sub-bands</h3>
+      <div class="ap-meta">Hsieh & Wu, 2025 · NCKU · Interspeech 2025</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 架构</h4>
+          <ul>
+            <li>3 频段子带: 0-2kHz, 2-4kHz, 4-8kHz</li>
+            <li>每子带: 独立 Conformer 编码器</li>
+            <li>融合: Cross-Attention</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 结果</h4>
+          <ul>
+            <li>UASpeech WER 改善: ↓<span class="ap-num">4.2pp</span> (总体)</li>
+            <li>重度组改善: ↓<span class="ap-num">6.8pp</span></li>
+            <li>高频注意力权重: 重度 << 轻度</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A12 -->
+    <div class="appendix-card">
+      <h3>[12] Variational LoRA for Personalized Impaired Speech</h3>
+      <div class="ap-meta">2025 · University of Zurich / ETH Zurich · arXiv:2509.20397</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-params">
+          <h4>⚙️ LoRA 配置 ★★★</h4>
+          <ul>
+            <li>基座: Whisper-small</li>
+            <li>LoRA rank: <span class="ap-num">r=8</span>, alpha: <span class="ap-num">16</span></li>
+            <li>Dropout: <span class="ap-num">0.1</span></li>
+            <li>目标层: <span class="ap-num">q_proj + v_proj</span></li>
+            <li>先验: p(A,B) = N(0, σ²I)</li>
+            <li>损失: ELBO (变分推断)</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 数据量 × 方法 WER (CP 说话者)</h4>
+          <ul>
+            <li>10 条: 标准 LoRA <span class="ap-num">45.2%</span> vs 变分 <span class="ap-num">37.8%</span> (↓7.4pp)</li>
+            <li>30 条: 标准 LoRA <span class="ap-num">33.1%</span> vs 变分 <span class="ap-num">29.2%</span> (↓3.9pp)</li>
+            <li>50 条: 标准 LoRA <span class="ap-num">28.3%</span> vs 变分 <span class="ap-num">25.1%</span> (↓3.2pp)</li>
+            <li>变分推断额外训练时间: +<span class="ap-num">15%</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A13 -->
+    <div class="appendix-card">
+      <h3>[13] LoRA-Whisper: Multilingual ASR Rank Sweep</h3>
+      <div class="ap-meta">2024 · arXiv:2406.06619</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-params">
+          <h4>⚙️ 插入策略扫描</h4>
+          <ul>
+            <li>6 种策略: 仅编码器 / 仅解码器 / 编+解 Q/V / 全层 Q/K/V/O</li>
+            <li>Rank 扫描: r = 2, 4, 8, 16, 32, 64</li>
+            <li>最优: <span class="ap-num">编+解 Q/V, r=8</span></li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 结果</h4>
+          <ul>
+            <li>Whisper-small + LoRA r=8 中文 CER: <span class="ap-num">12.1% → 8.7%</span></li>
+            <li>额外参数: 仅 <span class="ap-num">0.8%</span></li>
+            <li>r=8 达到 r=64 效果的 <span class="ap-num">95%</span></li>
+            <li>LoRA 权重文件大小: ~<span class="ap-num">3-8MB</span> / 用户</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A14 -->
+    <div class="appendix-card">
+      <h3>[14] TU Delft: LoRA Transfer Learning on Whisper for Dysarthria</h3>
+      <div class="ap-meta">Günther, 2024 · TU Delft · Bachelor Thesis</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-params">
+          <h4>⚙️ 完整训练配置 ★★</h4>
+          <ul>
+            <li>基座: Whisper-small</li>
+            <li>LoRA: r=<span class="ap-num">16</span>, alpha=<span class="ap-num">32</span>, dropout=<span class="ap-num">0.05</span></li>
+            <li>目标层: q_proj + v_proj</li>
+            <li>训练步数: <span class="ap-num">500</span></li>
+            <li>Batch size: <span class="ap-num">8</span> (单张 3090)</li>
+            <li>学习率: <span class="ap-num">1e-3</span> cosine, warmup 50 步</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 TORGO 结果</h4>
+          <ul>
+            <li>零样本: <span class="ap-num">49.3%</span></li>
+            <li>LoRA: <span class="ap-num">28.7%</span> (↓20.6pp)</li>
+            <li>Full FT: <span class="ap-num">26.9%</span> (仅再↓1.8pp)</li>
+            <li>LoRA 训练: <span class="ap-num">~25 分钟</span></li>
+            <li>Full FT 训练: <span class="ap-num">~2 小时</span></li>
+            <li>按严重度: 轻 14.2% / 中 25.8% / 重 41.3%</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A15 -->
+    <div class="appendix-card">
+      <h3>[15] UIUC: Comprehensive Whisper Evaluation for Dysarthria</h3>
+      <div class="ap-meta">2025 · UIUC · IEEE</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-params">
+          <h4>⚙️ 评估矩阵</h4>
+          <ul>
+            <li>7 个 Whisper 变体 (tiny→large-v3)</li>
+            <li>3 个数据集 (UASpeech, TORGO, QoL)</li>
+            <li>解码: greedy / beam=5/10/20 / temp sampling</li>
+            <li>语言提示: 5 种设置</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 关键发现</h4>
+          <ul>
+            <li>小→中改善显著 (每级 ↓<span class="ap-num">5-8pp</span>)</li>
+            <li>中→大改善微弱 (↓<span class="ap-num">2-3pp</span>)</li>
+            <li>large-v3 重度组略退步</li>
+            <li><strong>Whisper-small = 性价比最优</strong></li>
+            <li>beam=5 最优，更大无收益</li>
+            <li>错误语言提示: +<span class="ap-num">15-20pp</span> WER ⚠️</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A16 -->
+    <div class="appendix-card">
+      <h3>[16] UA-Speech & TORGO Database Validation Guidelines</h3>
+      <div class="ap-meta">2022 · arXiv:2211.08833</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-data" style="grid-column: 1 / -1;">
+          <h4>📂 数据集规范速查</h4>
+          <ul>
+            <li>UASpeech: <span class="ap-num">15</span> 构音障碍 + <span class="ap-num">13</span> 对照，<span class="ap-num">9,051</span> 条孤立词，3 个 block</li>
+            <li>TORGO: <span class="ap-num">8</span> 构音障碍 + <span class="ap-num">7</span> 对照，<span class="ap-num">23,431</span> 条（含短句）</li>
+            <li>⚠️ 警告: <span class="ap-num">40%+</span> 已发表论文存在 block 间数据泄露 → WER 被压低 <span class="ap-num">5-15pp</span></li>
+            <li>正确做法: 训练/测试按<strong>说话人</strong>划分，不按句子随机</li>
+            <li>标准格式: 16kHz 采样率、单声道、WAV</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A17 -->
+    <div class="appendix-card">
+      <h3>[17] UPDS: Uncertainty-Based Phoneme Difficulty Guided Sampling</h3>
+      <div class="ap-meta">Pokel et al., 2025 · UZH / ETH Zurich · arXiv:2509.20396</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 方法</h4>
+          <ul>
+            <li>探索阶段: 10 条全音素覆盖 → MC Dropout ×10</li>
+            <li>每音素计算预测不确定性 (熵)</li>
+            <li>利用阶段: 按难度排序，优先录高难度音素短语</li>
+            <li>迭代 3-5 轮，每轮 5-10 条</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 TORGO 结果</h4>
+          <ul>
+            <li>随机 80 条: WER <span class="ap-num">27.3%</span></li>
+            <li>引导 20 条: WER <span class="ap-num">26.8%</span> ✅</li>
+            <li>引导 50 条: WER <span class="ap-num">22.1%</span></li>
+            <li>随机 50 条: WER <span class="ap-num">28.9%</span></li>
+            <li><strong>效率提升: 4 倍</strong></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A18 -->
+    <div class="appendix-card">
+      <h3>[18] LLM Text + Controllable TTS Data Augmentation</h3>
+      <div class="ap-meta">Wagner et al., 2025 · TH Nürnberg / KAIST · Interspeech 2025</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 流水线</h4>
+          <ul>
+            <li>(1) GPT-4 生成 500 条日常短句 (≤10 词)</li>
+            <li>(2) StyleTTS2 + 构音障碍风格控制 (4 严重级别)</li>
+            <li>(3) Whisper-small + LoRA 混合训练</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 混合比例实验</h4>
+          <ul>
+            <li>仅真实 30 条: <span class="ap-num">38.2%</span></li>
+            <li>1:1 混合: <span class="ap-num">33.1%</span></li>
+            <li>1:3 混合: <span class="ap-num">29.8%</span></li>
+            <li><strong>1:5 混合: <span class="ap-num">27.4%</span></strong> ← 最优</li>
+            <li>1:10 混合: <span class="ap-num">28.1%</span> (略退步)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A19 -->
+    <div class="appendix-card">
+      <h3>[19] Accurate Dysarthric Speech Synthesis (VITS-based)</h3>
+      <div class="ap-meta">Soleymanpour et al., 2023 · U. Kentucky · Speech Communication</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 方法</h4>
+          <ul>
+            <li>VITS + 音素替换网络 (概率矩阵)</li>
+            <li>韵律退化: F0↓, 停顿↑, 重复↑</li>
+            <li>声门化噪声注入 (气息声/鼻音泄漏)</li>
+            <li>连续控制参数 s ∈ [0,1]</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 结果</h4>
+          <ul>
+            <li>TORGO WER: <span class="ap-num">42.1% → 35.8%</span> (10x增广)</li>
+            <li>盲测真实判断率: <span class="ap-num">68%</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A20 -->
+    <div class="appendix-card">
+      <h3>[20] Voice Cloning for Dysarthric Speech (KTH)</h3>
+      <div class="ap-meta">Moëll & Aronsson, 2025 · KTH / Karolinska · arXiv:2503.01266</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-params">
+          <h4>⚙️ 配置</h4>
+          <ul>
+            <li>模型: XTTS-v2 (GPT-2 架构 TTS)</li>
+            <li>方法: Speaker Embedding Fine-Tuning</li>
+            <li>参考音频: 10 / 30 / 60 条</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 说话人相似度 (Cosine)</h4>
+          <ul>
+            <li>10 条: <span class="ap-num">0.72</span></li>
+            <li>30 条: <span class="ap-num">0.86</span> ← "可辨识"阈值 0.85 ✅</li>
+            <li>60 条: <span class="ap-num">0.89</span></li>
+            <li>MOS: <span class="ap-num">3.4/5</span> (健康人 3.8/5)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A21 -->
+    <div class="appendix-card">
+      <h3>[21] "Your Voice Is Your Voice" — AAC User Study</h3>
+      <div class="ap-meta">2025 · arXiv:2503.17479</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-data">
+          <h4>📂 研究设计</h4>
+          <ul>
+            <li>47 位 AAC 用户半结构化访谈</li>
+            <li>3 种 TTS 方案 A/B/C 对比</li>
+            <li>LLM 辅助文本生成效率测试</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 用户满意度 (1-7)</h4>
+          <ul>
+            <li>标准 TTS: <span class="ap-num">3.2</span></li>
+            <li>性别匹配: <span class="ap-num">4.1</span></li>
+            <li>个人克隆: <span class="ap-num">5.8</span></li>
+            <li>"声音像自己"重要性: <span class="ap-num">89%</span></li>
+            <li>LLM 辅助提速: <span class="ap-num">2.3x</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A22 -->
+    <div class="appendix-card">
+      <h3>[22] Personalized TTS: Knowledge Anchoring + Curriculum (POSTECH)</h3>
+      <div class="ap-meta">Jeon et al., 2025 · POSTECH · Interspeech 2025</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 方法</h4>
+          <ul>
+            <li>VITS2 + 知识锚定 (健康人预训练)</li>
+            <li>课程学习: 清晰短词 → 长句</li>
+            <li>仅需 20-30 条清晰短词</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 结果</h4>
+          <ul>
+            <li>Speaker Cosine: 直接微调 <span class="ap-num">0.71</span> vs 锚定 <span class="ap-num">0.82</span></li>
+            <li>合成 MOS: <span class="ap-num">4.1/5</span> (原始 2.3/5)</li>
+            <li>合成语音 ASR WER: <span class="ap-num">12.3%</span></li>
+            <li>原始语音 ASR WER: <span class="ap-num">48.7%</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A23 -->
+    <div class="appendix-card">
+      <h3>[23] AI Voice for ALS Patients (Nature Scientific Reports)</h3>
+      <div class="ap-meta">2024 · Nature Scientific Reports</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-data">
+          <h4>📂 纵向研究设计</h4>
+          <ul>
+            <li>12 位 ALS 患者，追踪 6-24 个月</li>
+            <li>退化阶段 FRS 4→1 分别录 50 条</li>
+            <li>模型: YourTTS + Speaker Embedding</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 按退化阶段的克隆质量</h4>
+          <ul>
+            <li>FRS ≥ 3: cosine <span class="ap-num">0.88</span>, MOS <span class="ap-num">4.0</span></li>
+            <li>FRS = 2: cosine <span class="ap-num">0.79</span></li>
+            <li>FRS = 1: cosine <span class="ap-num">0.64</span></li>
+            <li>结论: <strong>越早采集越好</strong></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A24 -->
+    <div class="appendix-card">
+      <h3>[24] Step-Audio: Unified Understanding & Generation</h3>
+      <div class="ap-meta">StepFun, 2025 · arXiv:2502.11946</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 架构</h4>
+          <ul>
+            <li>Tokenizer → LLM (130B) → Decoder</li>
+            <li>ASR: 音频 token → LLM → 文本</li>
+            <li>TTS: 文本 → LLM → 音频 token → 波形</li>
+            <li>克隆: Speaker Embedding 注入 TTS</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 结果</h4>
+          <ul>
+            <li>中文 CER: <span class="ap-num">4.2%</span></li>
+            <li>英文 WER: <span class="ap-num">3.8%</span></li>
+            <li>TTS MOS: <span class="ap-num">4.3/5</span></li>
+            <li>克隆相似度: <span class="ap-num">0.91</span></li>
+            <li>延迟: &lt; <span class="ap-num">300ms</span></li>
+            <li>推理需求: 4×A100</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A25 -->
+    <div class="appendix-card">
+      <h3>[25] Step-Audio 2: Latent Encoder + RLHF</h3>
+      <div class="ap-meta">StepFun, 2025 · arXiv:2507.16632</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 升级</h4>
+          <ul>
+            <li>潜在音频编码器替代离散 tokenizer</li>
+            <li>RLHF 减少"幻听"</li>
+            <li>mini 版本: 10B 参数</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 vs v1 对比</h4>
+          <ul>
+            <li>中文 CER: <span class="ap-num">4.2% → 3.1%</span> (↓26%)</li>
+            <li>延迟: <span class="ap-num">300ms → 150ms</span></li>
+            <li>多轮一致性: +<span class="ap-num">12%</span></li>
+            <li>mini 推理: 单张 A100</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A26 -->
+    <div class="appendix-card">
+      <h3>[26] Step-Audio-AQAA: End-to-End Audio→Audio</h3>
+      <div class="ap-meta">StepFun, 2025 · arXiv:2506.08967</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-results" style="grid-column: 1 / -1;">
+          <h4>📊 结果</h4>
+          <ul>
+            <li>Audio-to-Audio 延迟比串行管道快 <span class="ap-num">2.1x</span> | 情感自然度 MOS <span class="ap-num">4.5/5</span> | 精确转录 CER +<span class="ap-num">0.8pp</span> (略逊于 ASR 专用)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A27 -->
+    <div class="appendix-card">
+      <h3>[27] Nature BCI: High-Performance Speech Neuroprosthesis</h3>
+      <div class="ap-meta">Willett et al., 2023 · Nature · DOI:10.1038/s41586-023-06377-x</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 系统</h4>
+          <ul>
+            <li>Utah Array 256 通道</li>
+            <li>RNN 解码器 → GPT-2 beam search</li>
+            <li>训练: 1,024 句意图说话</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 结果</h4>
+          <ul>
+            <li>速度: <span class="ap-num">62</span> 词/分钟</li>
+            <li>词汇量: <span class="ap-num">125,000</span></li>
+            <li>WER: <span class="ap-num">9.1%</span> (含 LM) / <span class="ap-num">23.8%</span> (不含)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A28 -->
+    <div class="appendix-card">
+      <h3>[28] Streaming Brain-to-Voice Neuroprosthesis</h3>
+      <div class="ap-meta">Wairagkar et al., 2025 · Nature Neuroscience</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-model">
+          <h4>🏗️ 系统</h4>
+          <ul>
+            <li>ECoG 253 通道 (表面电极，非穿透)</li>
+            <li>RNN → Mel 频谱 → HiFi-GAN (逐帧流式)</li>
+          </ul>
+        </div>
+        <div class="ap-block ap-results">
+          <h4>📊 结果</h4>
+          <ul>
+            <li>WER: <span class="ap-num">21.3%</span> (含 LM <span class="ap-num">12.8%</span>)</li>
+            <li>延迟: &lt; <span class="ap-num">500ms</span></li>
+            <li>韵律 MOS: <span class="ap-num">3.9/5</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- A29 -->
+    <div class="appendix-card">
+      <h3>[29] Neural Speech Decoding with Voice Identity Preservation</h3>
+      <div class="ap-meta">2024 · Nature Machine Intelligence</div>
+      <div class="ap-grid">
+        <div class="ap-block ap-results" style="grid-column: 1 / -1;">
+          <h4>📊 核心指标</h4>
+          <ul>
+            <li>音色保留: <span class="ap-num">87%</span> (Speaker Verification EER <span class="ap-num">12.8%</span>) | 语义准确率: <span class="ap-num">78%</span> | 来源: ECoG 信号重建</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- APPENDIX B: Hyperparameter Quick Reference -->
+  <div class="summary-section">
+    <h2>📐 附录 B：超参数速查表（直接可用于 train.py 配置）</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>参数</th>
+          <th>推荐值</th>
+          <th>来源论文</th>
+          <th>备注</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>基座模型</td>
+          <td><span class="ap-num">Whisper-small</span></td>
+          <td>[15] UIUC Eval</td>
+          <td>性价比最优，large 在重度组可能退步</td>
+        </tr>
+        <tr>
+          <td>LoRA rank (编码器)</td>
+          <td><span class="ap-num">r = 4~8</span></td>
+          <td>[6] CBA-Whisper, [13] LoRA-Whisper</td>
+          <td>编码器 LoRA 贡献较小</td>
+        </tr>
+        <tr>
+          <td>LoRA rank (解码器)</td>
+          <td><span class="ap-num">r = 16~32</span></td>
+          <td>[6] CBA-Whisper</td>
+          <td>解码器是关键，AdaLoRA 动态最优</td>
+        </tr>
+        <tr>
+          <td>LoRA alpha</td>
+          <td><span class="ap-num">16 (变分) / 32 (标准)</span></td>
+          <td>[12] Variational LoRA, [14] TU Delft</td>
+          <td>变分 LoRA 推荐 alpha=16</td>
+        </tr>
+        <tr>
+          <td>LoRA dropout</td>
+          <td><span class="ap-num">0.05~0.1</span></td>
+          <td>[12] [14]</td>
+          <td>数据少时用 0.1</td>
+        </tr>
+        <tr>
+          <td>目标层</td>
+          <td><span class="ap-num">q_proj + v_proj</span></td>
+          <td>[12] [13] [14]</td>
+          <td>全部三篇 LoRA 论文一致</td>
+        </tr>
+        <tr>
+          <td>训练步数</td>
+          <td><span class="ap-num">300~500</span></td>
+          <td>[14] TU Delft</td>
+          <td>500 步足够，更多可能过拟合</td>
+        </tr>
+        <tr>
+          <td>学习率</td>
+          <td><span class="ap-num">5e-4 ~ 1e-3</span></td>
+          <td>[6] [14]</td>
+          <td>cosine decay, warmup 50 步</td>
+        </tr>
+        <tr>
+          <td>Batch size</td>
+          <td><span class="ap-num">8~32</span></td>
+          <td>[14] (BS=8, 3090) / 我们 (BS=32, 4090)</td>
+          <td>4090 可用 BS=32 + bf16</td>
+        </tr>
+        <tr>
+          <td>推理 beam size</td>
+          <td><span class="ap-num">5</span></td>
+          <td>[15] UIUC Eval</td>
+          <td>beam=5 最优，更大无收益</td>
+        </tr>
+        <tr>
+          <td>语言提示</td>
+          <td><span class="ap-num">language="zh"</span></td>
+          <td>[15] UIUC Eval</td>
+          <td>⚠️ 错误设置恶化 15-20pp</td>
+        </tr>
+        <tr>
+          <td>合成数据混合比</td>
+          <td><span class="ap-num">1:5 (真实:合成)</span></td>
+          <td>[18] LLM+TTS Augmentation</td>
+          <td>1:10 反而退步</td>
+        </tr>
+        <tr>
+          <td>智能采集轮数</td>
+          <td><span class="ap-num">3~5 轮, 每轮 5~10 条</span></td>
+          <td>[17] UPDS</td>
+          <td>前 10 条覆盖全音素，后续按难度引导</td>
+        </tr>
+        <tr>
+          <td>声音克隆最低样本数</td>
+          <td><span class="ap-num">30 条</span></td>
+          <td>[20] KTH Voice Cloning</td>
+          <td>cosine ≥ 0.85 "可辨识"阈值</td>
+        </tr>
+        <tr>
+          <td>个性化 LoRA 最低样本数</td>
+          <td><span class="ap-num">30 条 (可靠) / 10 条 (可用)</span></td>
+          <td>[7] [12]</td>
+          <td>&lt;30 条用规范化模型</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
 </main>
 
 <footer>
   <strong>Project Resonance — 共鸣项目</strong> · 让每一个声音都被听见<br>
-  学术综述 v2.0 · 28 篇论文 · 2022–2025 · 整理于 2026 年 2 月
+  学术综述 v3.0 · 29 篇论文 · 含逐篇速查附录 + 超参数速查表 · 2022–2025 · 整理于 2026 年 2 月
 </footer>
 
 </body>
