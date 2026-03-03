@@ -1,0 +1,29 @@
+<view class="container">
+  <view class="hero">
+    <view class="logo-wrapper">
+      <image class="logo" src="/assets/icon.png" mode="aspectFit" />
+    </view>
+    <text class="title">共鸣</text>
+    <text class="subtitle">Project Resonance</text>
+    <text class="desc">为重度构音障碍者设计的语音识别训练系统</text>
+  </view>
+
+  <button class="enter-btn" type="primary" bindtap="enterApp">
+    进入应用
+  </button>
+
+  <view class="features">
+    <view class="feature-item">
+      <text class="feature-icon">🎙️</text>
+      <text class="feature-text">语音识别训练</text>
+    </view>
+    <view class="feature-item">
+      <text class="feature-icon">🔊</text>
+      <text class="feature-text">语音合成播报</text>
+    </view>
+    <view class="feature-item">
+      <text class="feature-icon">🎨</text>
+      <text class="feature-text">音色克隆</text>
+    </view>
+  </view>
+</view>
