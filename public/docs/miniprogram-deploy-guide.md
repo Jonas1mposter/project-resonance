@@ -37,13 +37,24 @@ npm run build
    - `VITE_SUPABASE_PUBLISHABLE_KEY` = 你的 anon key
 4. 部署后获得域名如 `resonance-xxx.vercel.app`
 
-#### 方案 B：腾讯云 COS 静态托管
+#### 方案 B：百度云 BOS 静态托管（推荐国内访问）
+
+1. 登录 [百度智能云控制台](https://console.bce.baidu.com)，创建 BOS 存储桶
+2. 在存储桶设置中开启 **静态网站托管**
+3. 上传 `dist/` 目录所有文件到存储桶根目录
+4. 如有自定义域名，在 BOS → 域名管理中绑定并配置 CNAME
+5. 获取访问域名（如 `your-bucket.bj.bcebos.com` 或自定义域名）
+6. 设置环境变量（如果构建时需要）：
+   - `VITE_SUPABASE_URL` = 后端地址
+   - `VITE_SUPABASE_PUBLISHABLE_KEY` = anon key
+
+#### 方案 C：腾讯云 COS 静态托管
 
 1. 创建腾讯云 COS 存储桶，开启静态网站托管
 2. 上传 `dist/` 目录所有文件
 3. 获取访问域名
 
-#### 方案 C：GitHub Pages
+#### 方案 D：GitHub Pages
 
 1. 导出到 GitHub
 2. 在仓库 Settings → Pages 开启，选择 `gh-pages` 分支
