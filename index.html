@@ -32,17 +32,29 @@
 
     <!-- Global error handler — catches JS errors before React loads -->
     <script>
-      window.onerror = function(msg, url, line) {
+      var _errs = [];
+      window.onerror = function(msg, url, line, col) {
+        _errs.push(msg + ' @ ' + (url||'') + ':' + line + ':' + col);
         var shell = document.getElementById('loading-shell');
         if (shell) {
-          shell.innerHTML = '<div style="text-align:center;padding:20px"><p style="color:#c0392b;font-size:14px;margin-bottom:8px">页面加载出错</p><p style="color:#888;font-size:12px">请刷新页面重试</p><button onclick="location.reload()" style="margin-top:12px;padding:8px 20px;background:hsl(175,45%,38%);color:#fff;border:none;border-radius:6px;font-size:13px">刷新</button></div>';
+          shell.innerHTML = '<div style="text-align:center;padding:20px">' +
+            '<p style="color:#c0392b;font-size:14px;margin-bottom:8px">页面加载出错</p>' +
+            '<p style="color:#888;font-size:12px;margin-bottom:8px;word-break:break-all">' + msg + '</p>' +
+            '<p style="color:#aaa;font-size:10px;margin-bottom:12px">文件: ' + (url||'').split('/').pop() + ' 行' + line + '</p>' +
+            '<button onclick="location.reload()" style="padding:8px 20px;background:hsl(175,45%,38%);color:#fff;border:none;border-radius:6px;font-size:13px">刷新</button>' +
+            '</div>';
         }
       };
-      // Timeout fallback — if app doesn't load in 15s, show error
+      // Timeout fallback
       setTimeout(function() {
         var shell = document.getElementById('loading-shell');
-        if (shell && shell.parentNode) {
-          shell.innerHTML = '<div style="text-align:center;padding:20px"><p style="color:#e67e22;font-size:14px;margin-bottom:8px">加载时间较长</p><p style="color:#888;font-size:12px">可能是网络问题，请检查网络后重试</p><button onclick="location.reload()" style="margin-top:12px;padding:8px 20px;background:hsl(175,45%,38%);color:#fff;border:none;border-radius:6px;font-size:13px">刷新</button></div>';
+        if (shell && shell.parentNode && shell.querySelector('#loading-shell > div')) {
+          var detail = _errs.length ? '错误: ' + _errs[0] : '可能是网络问题';
+          shell.innerHTML = '<div style="text-align:center;padding:20px">' +
+            '<p style="color:#e67e22;font-size:14px;margin-bottom:8px">加载超时</p>' +
+            '<p style="color:#888;font-size:12px;margin-bottom:12px;word-break:break-all">' + detail + '</p>' +
+            '<button onclick="location.reload()" style="padding:8px 20px;background:hsl(175,45%,38%);color:#fff;border:none;border-radius:6px;font-size:13px">刷新</button>' +
+            '</div>';
         }
       }, 15000);
     </script>
