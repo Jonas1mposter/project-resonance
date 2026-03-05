@@ -116,17 +116,23 @@ export default function Layout({ children }: LayoutProps) {
       </header>
 
       {/* Main Content */}
-      <main id="main-content" className="flex-1" role="main" aria-label="主要内容">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname}
-            {...pageVariants}
-            transition={isMotionReduced ? { duration: 0 } : { duration: 0.2 }}
-            className="container px-4 py-4 md:py-6 pb-2"
-          >
+      <main id="main-content" className="flex-1" role="main" aria-label="主要内容" style={{ minHeight: '200px' }}>
+        {isMotionReduced ? (
+          <div className="container px-4 py-4 md:py-6 pb-2">
             {children}
-          </motion.div>
-        </AnimatePresence>
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              {...pageVariants}
+              transition={{ duration: 0.2 }}
+              className="container px-4 py-4 md:py-6 pb-2"
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
+        )}
       </main>
 
       {/* Mobile Bottom Nav */}
