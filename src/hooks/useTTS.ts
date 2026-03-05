@@ -6,7 +6,10 @@ interface UseTTSReturn {
   isSpeaking: boolean;
   voices: SpeechSynthesisVoice[];
   hasChineseVoice: boolean;
+  isSupported: boolean;
 }
+
+const isSpeechSynthesisSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
 export function useTTS(rate = 1, volume = 1, pitch = 1, voiceURI = ''): UseTTSReturn {
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -15,6 +18,7 @@ export function useTTS(rate = 1, volume = 1, pitch = 1, voiceURI = ''): UseTTSRe
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   useEffect(() => {
+    if (!isSpeechSynthesisSupported) return;
     const loadVoices = () => {
       const v = speechSynthesis.getVoices();
       setVoices(v);
@@ -26,6 +30,10 @@ export function useTTS(rate = 1, volume = 1, pitch = 1, voiceURI = ''): UseTTSRe
   }, []);
 
   const speak = useCallback((text: string) => {
+    if (!isSpeechSynthesisSupported) {
+      console.warn('[TTS] speechSynthesis not supported in this browser');
+      return;
+    }
     speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = rate;
@@ -49,9 +57,10 @@ export function useTTS(rate = 1, volume = 1, pitch = 1, voiceURI = ''): UseTTSRe
   }, [rate, volume, pitch, voiceURI, voices]);
 
   const stop = useCallback(() => {
+    if (!isSpeechSynthesisSupported) return;
     speechSynthesis.cancel();
     setIsSpeaking(false);
   }, []);
 
-  return { speak, stop, isSpeaking, voices, hasChineseVoice };
+  return { speak, stop, isSpeaking, voices, hasChineseVoice, isSupported: isSpeechSynthesisSupported };
 }
