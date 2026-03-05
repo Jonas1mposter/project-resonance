@@ -76,7 +76,13 @@ export default function AppRoutes() {
     [phrases]
   );
 
-  if (!welcomeChecked) return null;
+  if (!welcomeChecked) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '50vh', color: '#999', fontSize: 14 }}>
+        加载中...
+      </div>
+    );
+  }
 
   if (showWelcome) {
     return (
