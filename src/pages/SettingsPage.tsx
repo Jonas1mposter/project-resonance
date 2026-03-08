@@ -1,8 +1,10 @@
+import { useNavigate } from 'react-router-dom';
 import { AppSettings, ASRSettings, DEFAULT_SETTINGS } from '@/types';
 import { useTTS } from '@/hooks/useTTS';
 import AccessibilitySettings from '@/components/AccessibilitySettings';
 import AccessibleStepper from '@/components/AccessibleStepper';
 import ASRSettingsPanel from '@/components/ASRSettingsPanel';
+import { List, Mic, ChevronRight } from 'lucide-react';
 
 interface SettingsPageProps {
   settings: AppSettings;
@@ -11,6 +13,7 @@ interface SettingsPageProps {
 
 export default function SettingsPage({ settings, onUpdate }: SettingsPageProps) {
   const { voices, hasChineseVoice } = useTTS();
+  const navigate = useNavigate();
 
   const update = (key: keyof AppSettings, value: number | string) => {
     onUpdate({ ...settings, [key]: value });
@@ -23,7 +26,33 @@ export default function SettingsPage({ settings, onUpdate }: SettingsPageProps) 
         <p className="mt-0.5 text-sm text-muted-foreground">调整识别、语音与辅助功能参数</p>
       </div>
 
-      {/* Accessibility Settings — prominent placement like Apple */}
+      {/* Quick links to hidden pages */}
+      <div className="rounded-xl border border-border bg-card divide-y divide-border">
+        <button
+          onClick={() => navigate('/phrases')}
+          className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-muted/50 transition-colors a11y-target"
+        >
+          <List className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
+          <div className="flex-1 min-w-0">
+            <span className="text-sm font-medium text-foreground">词表管理</span>
+            <p className="text-xs text-muted-foreground">添加、编辑、导入导出短语</p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
+        </button>
+        <button
+          onClick={() => navigate('/training')}
+          className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-muted/50 transition-colors a11y-target"
+        >
+          <Mic className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
+          <div className="flex-1 min-w-0">
+            <span className="text-sm font-medium text-foreground">录音训练</span>
+            <p className="text-xs text-muted-foreground">录制语音样本用于个性化识别</p>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
+        </button>
+      </div>
+
+      {/* Accessibility Settings */}
       <AccessibilitySettings />
 
       {/* ASR Settings */}
@@ -32,7 +61,7 @@ export default function SettingsPage({ settings, onUpdate }: SettingsPageProps) 
         onUpdate={(asr: ASRSettings) => onUpdate({ ...settings, asr })}
       />
 
-      {/* Recognition Settings — now uses AccessibleStepper instead of sliders */}
+      {/* Recognition Settings */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-5">
         <h3 className="font-semibold text-foreground">识别参数</h3>
 
@@ -68,7 +97,7 @@ export default function SettingsPage({ settings, onUpdate }: SettingsPageProps) 
         />
       </div>
 
-      {/* TTS Settings — now uses AccessibleStepper */}
+      {/* TTS Settings */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-5">
         <h3 className="font-semibold text-foreground">语音合成 (TTS)</h3>
 

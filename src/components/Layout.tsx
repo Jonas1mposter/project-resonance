@@ -1,7 +1,7 @@
 import { ReactNode, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, BookOpen, List, Settings, Keyboard, LogOut } from 'lucide-react';
+import { Mic, BookOpen, Settings, Keyboard, LogOut } from 'lucide-react';
 import SkipToContent from './SkipToContent';
 import KeyboardShortcutsPanel from './KeyboardShortcutsPanel';
 import { useKeyboardShortcuts, useShortcutHelpPanel } from '@/hooks/useKeyboardShortcuts';
@@ -14,10 +14,8 @@ interface LayoutProps {
 }
 
 const tabs = [
-  { path: '/training', label: '训练', icon: Mic, shortcutKey: '1' },
-  { path: '/', label: '使用', icon: BookOpen, shortcutKey: '2' },
-  { path: '/phrases', label: '词表', icon: List, shortcutKey: '3' },
-  { path: '/settings', label: '设置', icon: Settings, shortcutKey: '4' },
+  { path: '/', label: '使用', icon: BookOpen, shortcutKey: '1' },
+  { path: '/settings', label: '设置', icon: Settings, shortcutKey: '2' },
 ];
 
 

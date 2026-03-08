@@ -2,11 +2,8 @@ export const shortcutGroups = [
   {
     title: '导航',
     shortcuts: [
-      { keys: ['1'], description: '训练页面' },
-      { keys: ['2'], description: '使用页面' },
-      { keys: ['3'], description: '词表页面' },
-      { keys: ['4'], description: '设置页面' },
-      { keys: ['5'], description: '数据页面' },
+      { keys: ['1'], description: '使用页面' },
+      { keys: ['2'], description: '设置页面' },
     ],
   },
   {
