@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Download, Upload, X } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Download, Upload, X, ArrowLeft } from 'lucide-react';
 import { Phrase, CATEGORIES } from '@/types';
 
 interface PhrasesPageProps {
