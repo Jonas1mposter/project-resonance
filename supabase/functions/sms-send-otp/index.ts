@@ -6,86 +6,33 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// ---- BCE Signature (百度云 API 签名) ----
-async function hmacSha256Hex(key: Uint8Array, data: string): Promise<string> {
+// ---- Qiniu Token Signature ----
+async function qiniuSign(ak: string, sk: string, method: string, path: string, host: string, contentType: string, body: string): Promise<string> {
+  // Step 1: Construct data to sign
+  // data = <Method> + " " + <Path> + "\nHost: " + <Host> + "\nContent-Type: " + <contentType> + "\n\n" + <body>
+  let data = `${method} ${path}\nHost: ${host}\nContent-Type: ${contentType}\n\n`;
+  if (body && contentType !== "application/octet-stream") {
+    data += body;
+  }
+
+  // Step 2: HMAC-SHA1 sign and URL-safe base64 encode
+  const key = new TextEncoder().encode(sk);
   const cryptoKey = await crypto.subtle.importKey(
     "raw",
     key,
-    { name: "HMAC", hash: "SHA-256" },
+    { name: "HMAC", hash: "SHA-1" },
     false,
     ["sign"]
   );
   const sig = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(data));
-  return Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
 
-function uriEncode(str: string, encodeSlash = true): string {
-  return [...str]
-    .map((ch) => {
-      if (
-        (ch >= "A" && ch <= "Z") ||
-        (ch >= "a" && ch <= "z") ||
-        (ch >= "0" && ch <= "9") ||
-        ch === "." ||
-        ch === "-" ||
-        ch === "_" ||
-        ch === "~"
-      ) {
-        return ch;
-      }
-      if (ch === "/" && !encodeSlash) return ch;
-      return "%" + ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0");
-    })
-    .join("");
-}
+  // URL-safe Base64
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(sig)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
 
-async function bceSig(
-  ak: string,
-  sk: string,
-  method: string,
-  path: string,
-  headers: Record<string, string>,
-  _params: Record<string, string> = {}
-): Promise<string> {
-  const now = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
-  const expiration = 1800;
-  const authPrefix = `bce-auth-v1/${ak}/${now}/${expiration}`;
-
-  // signing key
-  const signingKey = await hmacSha256Hex(new TextEncoder().encode(sk), authPrefix);
-
-  // canonical URI
-  const canonicalUri = uriEncode(path, false);
-
-  // canonical query string
-  const qs = Object.keys(_params)
-    .sort()
-    .map((k) => `${uriEncode(k)}=${uriEncode(_params[k])}`)
-    .join("&");
-
-  // canonical headers — use host + content-type
-  const signedHeaderKeys = Object.keys(headers)
-    .map((k) => k.toLowerCase())
-    .filter((k) => k === "host" || k === "content-type")
-    .sort();
-
-  const canonicalHeaders = signedHeaderKeys
-    .map((k) => {
-      const val = headers[Object.keys(headers).find((h) => h.toLowerCase() === k)!];
-      return `${uriEncode(k)}:${uriEncode(val.trim())}`;
-    })
-    .join("\n");
-
-  const canonicalRequest = `${method}\n${canonicalUri}\n${qs}\n${canonicalHeaders}`;
-
-  const signature = await hmacSha256Hex(
-    new TextEncoder().encode(signingKey),
-    canonicalRequest
-  );
-
-  return `${authPrefix}/${signedHeaderKeys.join(";")}/${signature}`;
+  // Step 3: Qiniu <AK>:<encodedSign>
+  return `Qiniu ${ak}:${base64}`;
 }
 
 // ---- Main handler ----
@@ -127,41 +74,44 @@ Deno.serve(async (req) => {
     });
     if (insertErr) throw new Error(`DB insert failed: ${insertErr.message}`);
 
-    // Send SMS via Baidu Cloud
-    const BCE_AK = Deno.env.get("BCE_SMS_AK");
-    const BCE_SK = Deno.env.get("BCE_SMS_SK");
-    const BCE_INVOKE_ID = Deno.env.get("BCE_SMS_INVOKE_ID");
-    const BCE_TEMPLATE = Deno.env.get("BCE_SMS_TEMPLATE_CODE");
+    // Send SMS via Qiniu Cloud
+    const QINIU_AK = Deno.env.get("QINIU_SMS_AK");
+    const QINIU_SK = Deno.env.get("QINIU_SMS_SK");
+    const QINIU_TEMPLATE_ID = Deno.env.get("QINIU_SMS_TEMPLATE_ID");
 
-    if (!BCE_AK || !BCE_SK || !BCE_INVOKE_ID || !BCE_TEMPLATE) {
-      // If Baidu SMS not configured, return OTP in dev mode (remove in production!)
-      console.warn("Baidu SMS not configured, returning code for dev");
+    if (!QINIU_AK || !QINIU_SK || !QINIU_TEMPLATE_ID) {
+      // Dev mode: return OTP directly
+      console.warn("Qiniu SMS not configured, returning code for dev");
       return new Response(
         JSON.stringify({ success: true, dev_code: code }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const smsEndpoint = "smsv3.bj.baidubce.com";
-    const smsPath = "/api/v3/sendSms";
+    const smsHost = "sms.qiniuapi.com";
+    const smsPath = "/v1/message/single";
+    const contentType = "application/json";
     const smsBody = JSON.stringify({
-      mobile: phone,
-      signatureId: Deno.env.get("BCE_SMS_SIGNATURE_ID") || "",
-      template: BCE_TEMPLATE,
-      contentVar: { code },
+      template_id: QINIU_TEMPLATE_ID,
+      mobiles: [phone],
+      parameters: { code },
     });
 
-    const smsHeaders: Record<string, string> = {
-      Host: smsEndpoint,
-      "Content-Type": "application/json",
-    };
+    const authorization = await qiniuSign(
+      QINIU_AK,
+      QINIU_SK,
+      "POST",
+      smsPath,
+      smsHost,
+      contentType,
+      smsBody
+    );
 
-    const authorization = await bceSig(BCE_AK, BCE_SK, "POST", smsPath, smsHeaders);
-
-    const smsRes = await fetch(`https://${smsEndpoint}${smsPath}`, {
+    const smsRes = await fetch(`https://${smsHost}${smsPath}`, {
       method: "POST",
       headers: {
-        ...smsHeaders,
+        Host: smsHost,
+        "Content-Type": contentType,
         Authorization: authorization,
       },
       body: smsBody,
@@ -169,9 +119,11 @@ Deno.serve(async (req) => {
 
     const smsResult = await smsRes.text();
     if (!smsRes.ok) {
-      console.error("Baidu SMS error:", smsResult);
+      console.error("Qiniu SMS error:", smsResult);
       throw new Error(`短信发送失败: ${smsResult}`);
     }
+
+    console.log("Qiniu SMS response:", smsResult);
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
