@@ -120,6 +120,14 @@ export default function TrainingPage({ phrases, onAddRecording, onDeleteRecordin
 
   return (
     <section className="max-w-2xl mx-auto space-y-5" aria-labelledby="training-heading">
+      <button
+        onClick={() => navigate('/settings')}
+        className="a11y-target inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        aria-label="返回设置"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        返回设置
+      </button>
       {/* Header */}
       <div>
         <h2 id="training-heading" className="text-xl md:text-2xl font-bold text-foreground">训练录音</h2>
