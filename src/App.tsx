@@ -7,45 +7,47 @@ import Layout from "./components/Layout";
 import AppRoutes from "./AppRoutes";
 import NotFound from "./pages/NotFound";
 import AccessibilityProvider from "./components/AccessibilityProvider";
-import { useEffect, useState } from "react";
+import { useAuth } from "./hooks/useAuth";
+import { lazy, Suspense } from "react";
+
+const AuthPage = lazy(() => import("./pages/AuthPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 
 const queryClient = new QueryClient();
 
-/**
- * Diagnostic overlay — shown briefly on mobile to confirm React rendered.
- * Auto-hides after 2s. If you still see white screen, the issue is downstream.
- */
-function MobileDiagnostic() {
-  const [show, setShow] = useState(true);
-  
-  useEffect(() => {
-    console.log('[Resonance] React app mounted successfully');
-    console.log('[Resonance] UA:', navigator.userAgent);
-    const timer = setTimeout(() => setShow(false), 3000);
-    return () => clearTimeout(timer);
-  }, []);
-  
-  if (!show) return null;
-  
+function AuthenticatedApp() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-muted-foreground text-sm">加载中...</div>
+      </div>
+    );
+  }
+
   return (
-    <div
-      id="mount-diagnostic"
-      style={{
-        position: 'fixed',
-        bottom: 80,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        background: 'rgba(0,0,0,0.7)',
-        color: '#fff',
-        padding: '6px 16px',
-        borderRadius: 20,
-        fontSize: 12,
-        zIndex: 9999,
-        pointerEvents: 'none',
-      }}
-    >
-      ✓ 应用已加载
-    </div>
+    <BrowserRouter>
+      <Suspense fallback={<div className="flex items-center justify-center h-screen">加载中...</div>}>
+        <Routes>
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          {!user ? (
+            <Route path="*" element={<AuthPage />} />
+          ) : (
+            <Route
+              path="/*"
+              element={
+                <Layout>
+                  <Routes>
+                    <Route path="/*" element={<AppRoutes />} />
+                  </Routes>
+                </Layout>
+              }
+            />
+          )}
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
   );
 }
 
@@ -55,14 +57,7 @@ const App = () => (
       <AccessibilityProvider>
         <Toaster />
         <Sonner />
-        <MobileDiagnostic />
-        <BrowserRouter>
-          <Layout>
-            <Routes>
-              <Route path="/*" element={<AppRoutes />} />
-            </Routes>
-          </Layout>
-        </BrowserRouter>
+        <AuthenticatedApp />
       </AccessibilityProvider>
     </TooltipProvider>
   </QueryClientProvider>
