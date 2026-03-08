@@ -26,6 +26,7 @@ export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const { isOpen: shortcutsOpen, toggle: toggleShortcuts, close: closeShortcuts } = useShortcutHelpPanel();
   const { isMotionReduced } = useAccessibility();
+  const { signOut } = useAuth();
 
   // Plain number key navigation (normal priority, page shortcuts override via capture phase)
   const navShortcuts = useMemo(
