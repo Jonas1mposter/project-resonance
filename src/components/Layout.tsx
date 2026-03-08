@@ -1,12 +1,13 @@
 import { ReactNode, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, BookOpen, List, Settings, Keyboard } from 'lucide-react';
+import { Mic, BookOpen, List, Settings, Keyboard, LogOut } from 'lucide-react';
 import SkipToContent from './SkipToContent';
 import KeyboardShortcutsPanel from './KeyboardShortcutsPanel';
 import { useKeyboardShortcuts, useShortcutHelpPanel } from '@/hooks/useKeyboardShortcuts';
 import { useAccessibility } from '@/hooks/useAccessibility';
 import { shortcutGroups } from '@/data/shortcutGroups';
+import { useAuth } from '@/hooks/useAuth';
 
 interface LayoutProps {
   children: ReactNode;
@@ -25,6 +26,7 @@ export default function Layout({ children }: LayoutProps) {
   const navigate = useNavigate();
   const { isOpen: shortcutsOpen, toggle: toggleShortcuts, close: closeShortcuts } = useShortcutHelpPanel();
   const { isMotionReduced } = useAccessibility();
+  const { signOut } = useAuth();
 
   // Plain number key navigation (normal priority, page shortcuts override via capture phase)
   const navShortcuts = useMemo(
@@ -110,6 +112,15 @@ export default function Layout({ children }: LayoutProps) {
               title="键盘快捷键 (?)"
             >
               <Keyboard className="h-4 w-4" aria-hidden="true" />
+            </button>
+            {/* Logout */}
+            <button
+              onClick={signOut}
+              className="a11y-target rounded-lg p-2 text-muted-foreground hover:text-destructive hover:bg-muted transition-colors ml-1"
+              aria-label="退出登录"
+              title="退出登录"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>
