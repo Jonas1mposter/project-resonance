@@ -61,26 +61,19 @@ export default function AuthPage() {
   const handlePhoneSendOtp = async () => {
     setLoading(true);
     try {
-      const formattedPhone = phone.startsWith('+') ? phone : `+86${phone}`;
-      if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
-          phone: formattedPhone,
-          password: password || undefined,
-          options: {
-            data: { display_name: displayName || formattedPhone },
-          },
-        });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.auth.signInWithOtp({
-          phone: formattedPhone,
-        });
-        if (error) throw error;
-      }
+      const cleanPhone = phone.replace(/\D/g, '');
+      const { data, error } = await supabase.functions.invoke('sms-send-otp', {
+        body: { phone: cleanPhone },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
       setOtpSent(true);
       toast({
         title: '验证码已发送',
-        description: '请查收短信验证码。',
+        description: data?.dev_code
+          ? `开发模式验证码: ${data.dev_code}`
+          : '请查收短信验证码，5分钟内有效。',
       });
     } catch (err: any) {
       toast({
@@ -96,13 +89,24 @@ export default function AuthPage() {
   const handlePhoneVerifyOtp = async () => {
     setLoading(true);
     try {
-      const formattedPhone = phone.startsWith('+') ? phone : `+86${phone}`;
-      const { error } = await supabase.auth.verifyOtp({
-        phone: formattedPhone,
-        token: otp,
-        type: mode === 'signup' ? 'sms' : 'sms',
+      const cleanPhone = phone.replace(/\D/g, '');
+      const { data, error } = await supabase.functions.invoke('sms-verify-otp', {
+        body: { phone: cleanPhone, code: otp, displayName: displayName || undefined },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.session?.token_hash && data?.session?.email) {
+        // Use verifyOtp to exchange the token_hash for a real session
+        const { error: verifyErr } = await supabase.auth.verifyOtp({
+          email: data.session.email,
+          token_hash: data.session.token_hash,
+          type: 'magiclink',
+        });
+        if (verifyErr) throw verifyErr;
+      }
+
+      toast({ title: '登录成功' });
     } catch (err: any) {
       toast({
         title: '验证失败',
