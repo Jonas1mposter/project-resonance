@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, Mic, Check, ChevronDown, ChevronUp, Play, Trash2 } from 'lucide-react';
+import { Search, Mic, Check, ChevronDown, ChevronUp, Play, Trash2, ArrowLeft } from 'lucide-react';
 import { Phrase } from '@/types';
 import { CATEGORIES } from '@/types';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
