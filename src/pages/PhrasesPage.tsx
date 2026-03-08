@@ -21,6 +21,7 @@ export default function PhrasesPage({
   onExport,
   onImport,
 }: PhrasesPageProps) {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('全部');
   const [showAddForm, setShowAddForm] = useState(false);
