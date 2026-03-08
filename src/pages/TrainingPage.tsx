@@ -16,6 +16,7 @@ interface TrainingPageProps {
 }
 
 export default function TrainingPage({ phrases, onAddRecording, onDeleteRecording }: TrainingPageProps) {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('全部');
   const [expandedId, setExpandedId] = useState<string | null>(null);
