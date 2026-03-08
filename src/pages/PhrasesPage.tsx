@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Download, Upload, X } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Download, Upload, X, ArrowLeft } from 'lucide-react';
 import { Phrase, CATEGORIES } from '@/types';
 
 interface PhrasesPageProps {
@@ -20,6 +21,7 @@ export default function PhrasesPage({
   onExport,
   onImport,
 }: PhrasesPageProps) {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('全部');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -66,6 +68,14 @@ export default function PhrasesPage({
 
   return (
     <section className="max-w-2xl mx-auto space-y-5" aria-labelledby="phrases-heading">
+      <button
+        onClick={() => navigate('/settings')}
+        className="a11y-target inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        aria-label="返回设置"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        返回设置
+      </button>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 id="phrases-heading" className="text-xl md:text-2xl font-bold text-foreground">词表管理</h2>
