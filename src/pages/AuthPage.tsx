@@ -165,8 +165,9 @@ export default function AuthPage() {
               <TabsTrigger value="email" className="gap-1.5">
                 <Mail className="h-4 w-4" /> 邮箱
               </TabsTrigger>
-              <TabsTrigger value="phone" className="gap-1.5">
+              <TabsTrigger value="phone" className="gap-1.5" disabled>
                 <Phone className="h-4 w-4" /> 手机号
+                <span className="ml-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">即将上线</span>
               </TabsTrigger>
             </TabsList>
 
