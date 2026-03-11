@@ -1,16 +1,7 @@
-<view class="webview-container">
-  <!-- Loading 遮罩 -->
-  <view class="loading-overlay" wx:if="{{loading}}">
-    <view class="loading-spinner"></view>
-    <text class="loading-text">正在加载共鸣...</text>
-  </view>
-
-  <!-- WebView -->
-  <web-view
-    wx:if="{{url}}"
-    src="{{url}}"
-    bindmessage="onMessage"
-    binderror="onError"
-    bindload="onWebviewLoad"
-  />
-</view>
+<!-- web-view 是全屏独占组件，不能与其他元素共存 -->
+<web-view
+  src="{{url}}"
+  bindmessage="onMessage"
+  binderror="onError"
+  bindload="onWebviewLoad"
+/>
