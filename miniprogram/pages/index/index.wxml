@@ -1,29 +1,36 @@
 <view class="container">
   <view class="hero">
     <view class="logo-wrapper">
-      <image class="logo" src="/assets/icon.png" mode="aspectFit" />
+      <text class="logo-icon">🎙️</text>
     </view>
     <text class="title">共鸣</text>
     <text class="subtitle">Project Resonance</text>
-    <text class="desc">为重度构音障碍者设计的语音识别训练系统</text>
+    <text class="desc">为重度构音障碍者设计的\n语音识别与辅助沟通系统</text>
   </view>
 
-  <button class="enter-btn" type="primary" bindtap="enterApp">
+  <button class="enter-btn" bindtap="enterApp">
     进入应用
   </button>
 
   <view class="features">
     <view class="feature-item">
       <text class="feature-icon">🎙️</text>
-      <text class="feature-text">语音识别训练</text>
+      <text class="feature-title">语音识别</text>
+      <text class="feature-desc">定制化 ASR 识别训练</text>
     </view>
     <view class="feature-item">
       <text class="feature-icon">🔊</text>
-      <text class="feature-text">语音合成播报</text>
+      <text class="feature-title">语音合成</text>
+      <text class="feature-desc">文字转自然语音播报</text>
     </view>
     <view class="feature-item">
       <text class="feature-icon">🎨</text>
-      <text class="feature-text">音色克隆</text>
+      <text class="feature-title">音色克隆</text>
+      <text class="feature-desc">10秒克隆个人声纹</text>
     </view>
+  </view>
+
+  <view class="footer">
+    <text class="footer-text">v{{version}} · 百度杯参赛作品</text>
   </view>
 </view>
