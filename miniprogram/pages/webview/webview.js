@@ -6,6 +6,30 @@ Page({
   },
 
   onLoad() {
+    this._buildAndSetUrl();
+  },
+
+  onShow() {
+    // Check if we have a new transcript from the native recording page
+    if (app.globalData.hasNewTranscript) {
+      const transcript = app.globalData.lastTranscript || '';
+      const duration = app.globalData.lastRecordDuration || 0;
+      
+      // Clear the flag
+      app.globalData.hasNewTranscript = false;
+      
+      // Rebuild URL with transcript data as query params
+      const base = app.globalData.webviewUrl;
+      const sep = base.includes('?') ? '&' : '?';
+      const params = `wxTranscript=${encodeURIComponent(transcript)}&wxDuration=${duration}&t=${Date.now()}`;
+      const newUrl = `${base}${sep}${params}`;
+      
+      console.log('[WebView] Reloading with transcript:', transcript);
+      this.setData({ url: newUrl });
+    }
+  },
+
+  _buildAndSetUrl() {
     const url = app.globalData.webviewUrl;
     console.log('[WebView] Loading URL:', url);
     this.setData({ url });
@@ -18,6 +42,10 @@ Page({
       const lastMsg = messages[messages.length - 1];
       if (lastMsg.type === 'navigate') {
         wx.navigateBack();
+      }
+      if (lastMsg.type === 'startRecord') {
+        // WebView requests native recording
+        wx.navigateTo({ url: '/pages/record/record' });
       }
     }
   },
@@ -33,7 +61,7 @@ Page({
         if (res.confirm) {
           this.setData({ url: '' });
           setTimeout(() => {
-            this.setData({ url: app.globalData.webviewUrl });
+            this._buildAndSetUrl();
           }, 100);
         } else {
           wx.navigateBack();
