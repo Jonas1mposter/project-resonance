@@ -37,6 +37,7 @@ export default function UsagePage({
   const { isRecording, duration, startRecording, stopRecording, error: recError, audioLevel } = useAudioRecorder();
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [lastTranscript, setLastTranscript] = useState('');
+  const { isWechat, startNativeRecording, transcript: wxTranscript, recordDuration: wxDuration, clearTranscript } = useWechatBridge();
 
   const {
     finalText,
@@ -46,11 +47,26 @@ export default function UsagePage({
     reset: resetASR,
   } = useStepfunASR();
 
+  // Handle transcript received from WeChat native recording
+  useEffect(() => {
+    if (wxTranscript) {
+      setLastTranscript(wxTranscript);
+      setFlowState('speaking');
+      onSpeak(wxTranscript).catch(() => {}).finally(() => setFlowState('result'));
+      clearTranscript();
+    }
+  }, [wxTranscript, onSpeak, clearTranscript]);
+
   const handleStart = useCallback(async () => {
+    if (isWechat) {
+      // In WeChat Mini Program, use native recording
+      startNativeRecording();
+      return;
+    }
     setFlowState('recording');
     setLastTranscript('');
     await startRecording();
-  }, [startRecording]);
+  }, [isWechat, startNativeRecording, startRecording]);
 
   const handleStop = useCallback(async () => {
     // Immediately show processing state for instant feedback
