@@ -1,6 +1,6 @@
 App({
   globalData: {
-    webviewUrl: 'https://project-resonance.cn',
+    webviewUrl: 'https://project-resonance.lovable.app',
     lastTranscript: '',
     lastRecordFilePath: '',
     lastRecordDuration: 0,
