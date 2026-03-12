@@ -28,6 +28,7 @@ declare global {
           fail?: (err: unknown) => void;
         }) => void;
         navigateBack: () => void;
+        getEnv?: (callback: (res: { miniprogram?: boolean }) => void) => void;
       };
     };
     __wxjs_environment?: string;
@@ -47,13 +48,10 @@ interface WechatBridgeReturn {
   clearTranscript: () => void;
 }
 
-function isWechatMiniProgram(): boolean {
-  // Method 1: __wxjs_environment
+function isWechatMiniProgramSync(): boolean {
+  // Reliable sync checks only
   if (window.__wxjs_environment === 'miniprogram') return true;
-  // Method 2: User agent
   if (/miniProgram/i.test(navigator.userAgent)) return true;
-  // Method 3: wx.miniProgram exists
-  if (window.wx?.miniProgram) return true;
   return false;
 }
 
@@ -65,10 +63,36 @@ function getWxTranscriptFromUrl(): { transcript: string | null; duration: number
 }
 
 export function useWechatBridge(): WechatBridgeReturn {
-  const [isWechat] = useState(() => isWechatMiniProgram());
+  const [isWechat, setIsWechat] = useState(() => isWechatMiniProgramSync());
   const [transcript, setTranscript] = useState<string | null>(null);
   const [recordDuration, setRecordDuration] = useState(0);
   const initialChecked = useRef(false);
+
+  // Async refinement for environments where jweixin exists but not in Mini Program
+  useEffect(() => {
+    let mounted = true;
+
+    if (isWechatMiniProgramSync()) {
+      setIsWechat(true);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    try {
+      window.wx?.miniProgram?.getEnv?.((res) => {
+        if (!mounted) return;
+        setIsWechat(!!res?.miniprogram);
+      });
+    } catch (err) {
+      console.warn('[WechatBridge] getEnv check failed:', err);
+      if (mounted) setIsWechat(false);
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // On mount or URL change, check for transcript in URL params
   useEffect(() => {
