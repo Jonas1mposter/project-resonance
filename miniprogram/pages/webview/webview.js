@@ -37,17 +37,40 @@ Page({
 
   onMessage(e) {
     console.log('[WebView Message]', e.detail.data);
-    const messages = e.detail.data;
-    if (messages && messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg.type === 'navigate') {
-        wx.navigateBack();
-      }
-      if (lastMsg.type === 'startRecord') {
-        // WebView requests native recording
-        wx.navigateTo({ url: '/pages/record/record' });
-      }
+    const messages = e.detail?.data || [];
+    if (!messages || messages.length === 0) return;
+
+    const lastMsg = messages[messages.length - 1] || {};
+    const msgType = lastMsg.type || (lastMsg.data && lastMsg.data.type);
+
+    if (msgType === 'navigate') {
+      wx.navigateBack();
+      return;
     }
+
+    if (msgType === 'startRecord') {
+      this._openRecordPage();
+    }
+  },
+
+  _openRecordPage() {
+    const paths = ['/pages/record/record', '../record/record'];
+    const tryOpen = (index) => {
+      if (index >= paths.length) {
+        wx.showToast({ title: '录音页打开失败', icon: 'none' });
+        return;
+      }
+
+      wx.navigateTo({
+        url: paths[index],
+        fail: (err) => {
+          console.error('[WebView] navigateTo failed:', paths[index], err);
+          tryOpen(index + 1);
+        }
+      });
+    };
+
+    tryOpen(0);
   },
 
   onError(e) {

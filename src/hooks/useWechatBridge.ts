@@ -17,7 +17,16 @@ declare global {
     wx?: {
       miniProgram?: {
         postMessage: (data: { data: Record<string, unknown> }) => void;
-        navigateTo: (opts: { url: string }) => void;
+        navigateTo: (opts: {
+          url: string;
+          success?: () => void;
+          fail?: (err: unknown) => void;
+        }) => void;
+        redirectTo?: (opts: {
+          url: string;
+          success?: () => void;
+          fail?: (err: unknown) => void;
+        }) => void;
         navigateBack: () => void;
       };
     };
@@ -81,13 +90,36 @@ export function useWechatBridge(): WechatBridgeReturn {
 
   const startNativeRecording = useCallback(() => {
     if (!isWechat || !window.wx?.miniProgram) return;
+
     // Reset state
     initialChecked.current = false;
     setTranscript(null);
     setRecordDuration(0);
-    // Notify mini program and navigate to recording page
+
+    // Keep postMessage for compatibility/analytics on mini program side
     window.wx.miniProgram.postMessage({ data: { type: 'startRecord' } });
-    window.wx.miniProgram.navigateTo({ url: '/pages/record/record' });
+
+    const openRecordPage = (url: string, fallback?: () => void) => {
+      window.wx?.miniProgram?.navigateTo({
+        url,
+        fail: (err) => {
+          console.error('[WechatBridge] navigateTo failed:', url, err);
+          fallback?.();
+        },
+      });
+    };
+
+    // Try absolute path first, then relative path, finally redirectTo fallback
+    openRecordPage('/pages/record/record', () => {
+      openRecordPage('pages/record/record', () => {
+        window.wx?.miniProgram?.redirectTo?.({
+          url: '/pages/record/record',
+          fail: (err) => {
+            console.error('[WechatBridge] redirectTo failed:', err);
+          },
+        });
+      });
+    });
   }, [isWechat]);
 
   const clearTranscript = useCallback(() => {
