@@ -17,7 +17,16 @@ declare global {
     wx?: {
       miniProgram?: {
         postMessage: (data: { data: Record<string, unknown> }) => void;
-        navigateTo: (opts: { url: string }) => void;
+        navigateTo: (opts: {
+          url: string;
+          success?: () => void;
+          fail?: (err: unknown) => void;
+        }) => void;
+        redirectTo?: (opts: {
+          url: string;
+          success?: () => void;
+          fail?: (err: unknown) => void;
+        }) => void;
         navigateBack: () => void;
       };
     };
