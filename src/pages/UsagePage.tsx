@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Mic, RotateCcw, Check, X } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useStepfunASR } from '@/hooks/useStepfunASR';
-import { useWechatBridge } from '@/hooks/useWechatBridge';
+import { useWechatBridge, getWechatDebugInfo } from '@/hooks/useWechatBridge';
 import AudioRecorderButton from '@/components/AudioRecorderButton';
 import ASRStreamingResult from '@/components/ASRStreamingResult';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -59,14 +59,19 @@ export default function UsagePage({
 
   const handleStart = useCallback(async () => {
     if (isWechat) {
-      // In WeChat Mini Program, use native recording via bridge
       console.log('[UsagePage] WeChat detected, starting native recording');
       startNativeRecording();
       return;
     }
-    // Check if getUserMedia is available (not available in some WebViews)
+    // Fallback: if getUserMedia unavailable but wx.miniProgram exists, try native bridge anyway
     if (!navigator.mediaDevices?.getUserMedia) {
+      if (window.wx?.miniProgram) {
+        console.log('[UsagePage] No getUserMedia but wx bridge available, trying native recording');
+        startNativeRecording();
+        return;
+      }
       toast.error('当前环境不支持录音，请在微信小程序或现代浏览器中使用');
+      console.error('[UsagePage] Debug info:', getWechatDebugInfo());
       return;
     }
     setFlowState('recording');
@@ -323,6 +328,16 @@ export default function UsagePage({
         <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive" role="alert">
           {recError || asrError || ttsError}
         </div>
+      )}
+
+      {/* Debug info - visible only in development or WeChat for troubleshooting */}
+      {(isWechat || import.meta.env.DEV) && (
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer">调试信息</summary>
+          <pre className="mt-1 rounded bg-muted p-2 overflow-auto max-h-32">
+            {JSON.stringify(getWechatDebugInfo(), null, 2)}
+          </pre>
+        </details>
       )}
     </section>
   );

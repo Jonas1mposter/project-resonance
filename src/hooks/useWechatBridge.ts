@@ -52,7 +52,21 @@ function isWechatMiniProgramSync(): boolean {
   // Reliable sync checks only
   if (window.__wxjs_environment === 'miniprogram') return true;
   if (/miniProgram/i.test(navigator.userAgent)) return true;
+  // If wx.miniProgram exists AND we're in a webview-like env (no getUserMedia), treat as wechat
+  if (window.wx?.miniProgram && !navigator.mediaDevices?.getUserMedia) return true;
   return false;
+}
+
+/** Debug info for troubleshooting environment detection */
+export function getWechatDebugInfo(): Record<string, unknown> {
+  return {
+    __wxjs_environment: window.__wxjs_environment,
+    uaHasMiniProgram: /miniProgram/i.test(navigator.userAgent),
+    hasWx: !!window.wx,
+    hasMiniProgram: !!window.wx?.miniProgram,
+    hasGetUserMedia: !!navigator.mediaDevices?.getUserMedia,
+    isWechat: isWechatMiniProgramSync(),
+  };
 }
 
 function getWxTranscriptFromUrl(): { transcript: string | null; duration: number } {
