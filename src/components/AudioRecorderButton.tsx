@@ -11,6 +11,14 @@ interface AudioRecorderButtonProps {
   size?: 'sm' | 'lg';
 }
 
+/** Detect if we're in a restricted WebView (WeChat) where framer-motion may break clicks */
+function useIsRestrictedWebView() {
+  if (typeof window === 'undefined') return false;
+  if (window.__wxjs_environment === 'miniprogram') return true;
+  if (/miniProgram|MicroMessenger/i.test(navigator.userAgent)) return true;
+  return false;
+}
+
 export default function AudioRecorderButton({
   isRecording,
   duration,
@@ -20,6 +28,7 @@ export default function AudioRecorderButton({
   size = 'lg',
 }: AudioRecorderButtonProps) {
   const { isMotionReduced } = useAccessibility();
+  const isRestricted = useIsRestrictedWebView();
 
   const formatDuration = (s: number) => {
     const mins = Math.floor(s / 60);
@@ -27,44 +36,71 @@ export default function AudioRecorderButton({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Larger targets for a11y: lg=96px, sm=64px
   const buttonSize = size === 'lg' ? 'h-24 w-24' : 'h-16 w-16';
   const iconSize = size === 'lg' ? 'h-10 w-10' : 'h-6 w-6';
 
+  const handleClick = () => {
+    console.log('[AudioRecorderButton] clicked, isRecording:', isRecording, 'isRestricted:', isRestricted);
+    if (isRecording) {
+      onStop();
+    } else {
+      onStart();
+    }
+  };
+
+  const buttonClassName = `relative flex items-center justify-center rounded-full transition-all ${buttonSize} ${
+    isRecording
+      ? 'bg-recording text-recording-foreground recording-pulse'
+      : 'bg-primary text-primary-foreground hover:opacity-90'
+  }`;
+
+  const buttonContent = (
+    <>
+      {isRecording && !isMotionReduced && !isRestricted && (
+        <motion.div
+          className="absolute inset-0 rounded-full bg-recording/30"
+          animate={{ scale: [1, 1 + audioLevel * 0.4, 1] }}
+          transition={{ duration: 0.3, repeat: Infinity }}
+          aria-hidden="true"
+        />
+      )}
+      {isRecording && (isMotionReduced || isRestricted) && (
+        <div
+          className="absolute inset-0 rounded-full border-4 border-recording-foreground/30"
+          aria-hidden="true"
+        />
+      )}
+      {isRecording ? (
+        <Square className={iconSize} fill="currentColor" aria-hidden="true" />
+      ) : (
+        <Mic className={iconSize} aria-hidden="true" />
+      )}
+    </>
+  );
+
   return (
     <div className="flex flex-col items-center gap-3">
-      <motion.button
-        onClick={isRecording ? onStop : onStart}
-        whileTap={isMotionReduced ? undefined : { scale: 0.92 }}
-        aria-label={isRecording ? `停止录音，已录制 ${formatDuration(duration)}` : '开始录音'}
-        aria-pressed={isRecording}
-        role="button"
-        className={`relative flex items-center justify-center rounded-full transition-all ${buttonSize} ${
-          isRecording
-            ? 'bg-recording text-recording-foreground recording-pulse'
-            : 'bg-primary text-primary-foreground hover:opacity-90'
-        }`}
-      >
-        {isRecording && !isMotionReduced && (
-          <motion.div
-            className="absolute inset-0 rounded-full bg-recording/30"
-            animate={{ scale: [1, 1 + audioLevel * 0.4, 1] }}
-            transition={{ duration: 0.3, repeat: Infinity }}
-            aria-hidden="true"
-          />
-        )}
-        {isRecording && isMotionReduced && (
-          <div
-            className="absolute inset-0 rounded-full border-4 border-recording-foreground/30"
-            aria-hidden="true"
-          />
-        )}
-        {isRecording ? (
-          <Square className={iconSize} fill="currentColor" aria-hidden="true" />
-        ) : (
-          <Mic className={iconSize} aria-hidden="true" />
-        )}
-      </motion.button>
+      {isRestricted ? (
+        <button
+          onClick={handleClick}
+          aria-label={isRecording ? `停止录音，已录制 ${formatDuration(duration)}` : '开始录音'}
+          aria-pressed={isRecording}
+          className={buttonClassName}
+        >
+          {buttonContent}
+        </button>
+      ) : (
+        <motion.button
+          onClick={handleClick}
+          whileTap={isMotionReduced ? undefined : { scale: 0.92 }}
+          aria-label={isRecording ? `停止录音，已录制 ${formatDuration(duration)}` : '开始录音'}
+          aria-pressed={isRecording}
+          role="button"
+          className={buttonClassName}
+        >
+          {buttonContent}
+        </motion.button>
+      )}
 
       {isRecording ? (
         <div className="flex items-center gap-2 text-sm font-medium text-recording" role="status" aria-live="polite">
