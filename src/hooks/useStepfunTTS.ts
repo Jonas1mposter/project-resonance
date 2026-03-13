@@ -99,22 +99,6 @@ async function playStreamingAudio(
   }
 }
 
-/**
- * Pre-warm edge functions by sending an OPTIONS preflight.
- * This eliminates cold-start latency on the first real request.
- */
-function prewarmEdgeFunctions() {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  if (!supabaseUrl) return;
-
-  const endpoints = ['stepfun-tts', 'stepfun-asr'];
-  endpoints.forEach((fn) => {
-    fetch(`${supabaseUrl}/functions/v1/${fn}`, {
-      method: 'OPTIONS',
-    }).catch(() => {});
-  });
-}
-
 export function useStepfunTTS(): UseStepfunTTSReturn {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
