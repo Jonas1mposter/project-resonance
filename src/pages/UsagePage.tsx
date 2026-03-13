@@ -72,7 +72,8 @@ export default function UsagePage({
     // Immediately show processing state for instant feedback
     setFlowState('processing');
 
-    const result = await stopRecording();
+    // Skip CPU-heavy WAV conversion when voice is already cloned
+    const result = await stopRecording({ includeWav: !voiceId });
     if (!result) {
       setFlowState('idle');
       return;
@@ -80,17 +81,17 @@ export default function UsagePage({
 
     const { webmBlob, blob: wavBlob, duration: recDuration } = result;
 
-    // Run ASR and voice cloning in PARALLEL for speed
+    // Voice cloning is non-blocking: do it in background, never delay ASR -> TTS
     const shouldClone = !voiceId && recDuration >= 10;
-    const [text, cloneResult] = await Promise.all([
-      transcribe(webmBlob),
-      shouldClone
-        ? (setFlowState('processing'), onCloneVoice(wavBlob).then(vid => {
-            if (vid) toast.success('音色克隆成功');
-            return vid;
-          }).catch(() => null))
-        : Promise.resolve(null),
-    ]);
+    if (shouldClone) {
+      void onCloneVoice(wavBlob)
+        .then((vid) => {
+          if (vid) toast.success('音色克隆成功');
+        })
+        .catch(() => null);
+    }
+
+    const text = await transcribe(webmBlob);
 
     if (!text) {
       setFlowState('result');
@@ -98,18 +99,17 @@ export default function UsagePage({
     }
 
     setLastTranscript(text);
-    const speakVoice = cloneResult || undefined;
 
     // Auto-speak the transcribed text immediately
     setFlowState('speaking');
     try {
-      await onSpeak(text, speakVoice);
+      await onSpeak(text);
     } catch {
       // TTS error handled by parent
     }
 
     setFlowState('result');
-  }, [stopRecording, transcribe, voiceId, onCloneVoice, onSpeak]);
+  }, [stopRecording, voiceId, onCloneVoice, transcribe, onSpeak]);
 
   const handleReset = useCallback(() => {
     setFlowState('idle');
