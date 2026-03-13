@@ -2,7 +2,7 @@
  * StepFun ASR Edge Function
  *
  * Receives audio (as multipart form data or raw binary) from the client,
- * forwards it to the StepFun transcription API, and returns the result.
+ * forwards it to the StepFun transcription API, and streams the result back.
  *
  * POST /stepfun-asr
  *   Body: multipart/form-data with "file" field (audio blob)
@@ -46,22 +46,19 @@ Deno.serve(async (req) => {
     let formData: FormData;
 
     if (contentType.includes("multipart/form-data")) {
-      // Client sent multipart — forward as-is
       formData = await req.formData();
     } else {
-      // Client sent raw audio binary — wrap in FormData
       const audioBytes = await req.arrayBuffer();
       const blob = new Blob([audioBytes], { type: "audio/webm" });
       formData = new FormData();
       formData.append("file", blob, "recording.webm");
     }
 
-    // Ensure model is set
     if (!formData.has("model")) {
       formData.append("model", "step-asr");
     }
 
-    // Forward to StepFun API
+    // Forward to StepFun API and stream response directly
     const response = await fetch(STEPFUN_API_URL, {
       method: "POST",
       headers: {
@@ -70,14 +67,9 @@ Deno.serve(async (req) => {
       body: formData,
     });
 
-    const result = await response.text();
-
     if (!response.ok) {
-      console.error(
-        "[stepfun-asr] API error:",
-        response.status,
-        result
-      );
+      const result = await response.text();
+      console.error("[stepfun-asr] API error:", response.status, result);
       return new Response(
         JSON.stringify({
           error: "StepFun API error",
@@ -91,7 +83,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    return new Response(result, {
+    // Stream JSON response directly without buffering
+    return new Response(response.body, {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

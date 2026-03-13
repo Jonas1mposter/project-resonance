@@ -80,8 +80,17 @@ export default function UsagePage({
 
     const { webmBlob, blob: wavBlob, duration: recDuration } = result;
 
-    // Step 1: ASR transcription — send compressed webm (50-80% smaller than WAV)
-    const text = await transcribe(webmBlob);
+    // Run ASR and voice cloning in PARALLEL for speed
+    const shouldClone = !voiceId && recDuration >= 10;
+    const [text, cloneResult] = await Promise.all([
+      transcribe(webmBlob),
+      shouldClone
+        ? (setFlowState('processing'), onCloneVoice(wavBlob).then(vid => {
+            if (vid) toast.success('音色克隆成功');
+            return vid;
+          }).catch(() => null))
+        : Promise.resolve(null),
+    ]);
 
     if (!text) {
       setFlowState('result');
@@ -89,19 +98,9 @@ export default function UsagePage({
     }
 
     setLastTranscript(text);
+    const speakVoice = cloneResult || undefined;
 
-    // Step 2: Clone voice if needed (use WAV for cloning quality)
-    let speakVoice: string | undefined;
-    if (!voiceId && recDuration >= 10) {
-      setFlowState('cloning');
-      const vid = await onCloneVoice(wavBlob, text);
-      if (vid) {
-        toast.success('音色克隆成功');
-        speakVoice = vid;
-      }
-    }
-
-    // Step 3: Auto-speak the transcribed text
+    // Auto-speak the transcribed text immediately
     setFlowState('speaking');
     try {
       await onSpeak(text, speakVoice);
