@@ -44,7 +44,7 @@ async function playStreamingAudio(
           const reader = body.getReader();
           let started = false;
 
-          const appendChunk = (chunk: Uint8Array) =>
+          const appendChunk = (chunk: ArrayBuffer) =>
             new Promise<void>((res) => {
               sourceBuffer.appendBuffer(chunk);
               sourceBuffer.addEventListener('updateend', () => res(), { once: true });
