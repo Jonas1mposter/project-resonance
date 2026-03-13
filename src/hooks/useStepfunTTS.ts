@@ -1,25 +1,119 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 interface UseStepfunTTSReturn {
-  /** Speak text using StepFun TTS with optional cloned voice */
   speak: (text: string, overrideVoice?: string) => Promise<void>;
-  /** Stop current playback */
   stop: () => void;
-  /** Whether audio is currently playing */
   isSpeaking: boolean;
-  /** Clone a voice from reference audio blob (5-10s) */
   cloneVoice: (audioBlob: Blob, referenceText?: string) => Promise<string | null>;
-  /** Whether voice cloning is in progress */
   isCloning: boolean;
-  /** Current cloned voice ID */
   voiceId: string | null;
-  /** Set voice ID manually (e.g. from localStorage) */
   setVoiceId: (id: string | null) => void;
-  /** Error message */
   error: string | null;
 }
 
 const VOICE_ID_KEY = 'resonance_cloned_voice_id';
+
+/**
+ * Try streaming audio playback via MediaSource Extensions (Chrome/Edge).
+ * Falls back to full-blob playback on unsupported browsers (Safari/Firefox).
+ */
+async function playStreamingAudio(
+  response: Response,
+  audioRef: React.MutableRefObject<HTMLAudioElement | null>,
+  onEnd: () => void,
+): Promise<void> {
+  const body = response.body;
+
+  // Check MSE support for audio/mpeg
+  const mseSupported =
+    typeof MediaSource !== 'undefined' &&
+    MediaSource.isTypeSupported('audio/mpeg');
+
+  if (mseSupported && body) {
+    // --- Streaming playback: start playing as soon as first chunks arrive ---
+    const audio = new Audio();
+    audioRef.current = audio;
+
+    const mediaSource = new MediaSource();
+    audio.src = URL.createObjectURL(mediaSource);
+
+    await new Promise<void>((resolve, reject) => {
+      mediaSource.addEventListener('sourceopen', async () => {
+        try {
+          const sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
+          const reader = body.getReader();
+          let started = false;
+
+          const appendChunk = (chunk: ArrayBuffer) =>
+            new Promise<void>((res) => {
+              sourceBuffer.appendBuffer(chunk);
+              sourceBuffer.addEventListener('updateend', () => res(), { once: true });
+            });
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              if (mediaSource.readyState === 'open') {
+                mediaSource.endOfStream();
+              }
+              break;
+            }
+            if (value) {
+              await appendChunk(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength) as ArrayBuffer);
+              // Start playback after first chunk is buffered
+              if (!started) {
+                started = true;
+                audio.play().catch(() => {});
+              }
+            }
+          }
+
+          audio.onended = () => { onEnd(); resolve(); };
+          audio.onerror = () => { onEnd(); resolve(); };
+
+          // If audio already ended (very short clip)
+          if (audio.ended) { onEnd(); resolve(); }
+        } catch (e) {
+          onEnd();
+          reject(e);
+        }
+      }, { once: true });
+    });
+  } else {
+    // --- Fallback: full-blob playback ---
+    const audioBlob = await response.blob();
+    const audioUrl = URL.createObjectURL(audioBlob);
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+
+    audio.onended = () => {
+      onEnd();
+      URL.revokeObjectURL(audioUrl);
+    };
+    audio.onerror = () => {
+      onEnd();
+      URL.revokeObjectURL(audioUrl);
+    };
+
+    await audio.play();
+  }
+}
+
+/**
+ * Pre-warm edge functions by sending an OPTIONS preflight.
+ * This eliminates cold-start latency on the first real request.
+ */
+function prewarmEdgeFunctions() {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (!supabaseUrl) return;
+
+  const endpoints = ['stepfun-tts', 'stepfun-asr'];
+  endpoints.forEach((fn) => {
+    fetch(`${supabaseUrl}/functions/v1/${fn}`, {
+      method: 'OPTIONS',
+    }).catch(() => {});
+  });
+}
 
 export function useStepfunTTS(): UseStepfunTTSReturn {
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -34,6 +128,11 @@ export function useStepfunTTS(): UseStepfunTTSReturn {
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Pre-warm edge functions on first mount
+  useEffect(() => {
+    prewarmEdgeFunctions();
+  }, []);
+
   const setVoiceId = useCallback((id: string | null) => {
     setVoiceIdState(id);
     try {
@@ -47,7 +146,12 @@ export function useStepfunTTS(): UseStepfunTTSReturn {
 
   const speak = useCallback(async (text: string, overrideVoice?: string) => {
     setError(null);
-    stop();
+    // Stop any current playback
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -58,15 +162,14 @@ export function useStepfunTTS(): UseStepfunTTSReturn {
       const effectiveVoice = overrideVoice || voiceId || 'cixingnansheng';
 
       const makeRequest = async (voice: string) => {
-        const resp = await fetch(`${supabaseUrl}/functions/v1/stepfun-tts`, {
+        return fetch(`${supabaseUrl}/functions/v1/stepfun-tts`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
-          body: JSON.stringify({ text, voice }),
+          body: JSON.stringify({ text, voice, speed: 1.0 }),
         });
-        return resp;
       };
 
       let response = await makeRequest(effectiveVoice);
@@ -87,27 +190,14 @@ export function useStepfunTTS(): UseStepfunTTSReturn {
         throw new Error(errData.error || `TTS 请求失败 (${response.status})`);
       }
 
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-
-      audio.onended = () => {
-        setIsSpeaking(false);
-        URL.revokeObjectURL(audioUrl);
-      };
-      audio.onerror = () => {
-        setIsSpeaking(false);
-        URL.revokeObjectURL(audioUrl);
-      };
-
-      await audio.play();
+      // Stream audio playback - starts playing before full download completes
+      await playStreamingAudio(response, audioRef, () => setIsSpeaking(false));
     } catch (err) {
       setIsSpeaking(false);
       const message = err instanceof Error ? err.message : 'TTS 播放失败';
       setError(message);
     }
-  }, [voiceId]);
+  }, [voiceId, setVoiceId]);
 
   const stop = useCallback(() => {
     if (audioRef.current) {
