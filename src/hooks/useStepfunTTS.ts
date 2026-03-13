@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 interface UseStepfunTTSReturn {
   speak: (text: string, overrideVoice?: string) => Promise<void>;
@@ -99,22 +99,6 @@ async function playStreamingAudio(
   }
 }
 
-/**
- * Pre-warm edge functions by sending an OPTIONS preflight.
- * This eliminates cold-start latency on the first real request.
- */
-function prewarmEdgeFunctions() {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  if (!supabaseUrl) return;
-
-  const endpoints = ['stepfun-tts', 'stepfun-asr'];
-  endpoints.forEach((fn) => {
-    fetch(`${supabaseUrl}/functions/v1/${fn}`, {
-      method: 'OPTIONS',
-    }).catch(() => {});
-  });
-}
-
 export function useStepfunTTS(): UseStepfunTTSReturn {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
@@ -127,11 +111,6 @@ export function useStepfunTTS(): UseStepfunTTSReturn {
   });
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Pre-warm edge functions on first mount
-  useEffect(() => {
-    prewarmEdgeFunctions();
-  }, []);
 
   const setVoiceId = useCallback((id: string | null) => {
     setVoiceIdState(id);
