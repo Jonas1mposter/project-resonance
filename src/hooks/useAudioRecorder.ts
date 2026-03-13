@@ -145,13 +145,15 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
     return new Blob([buffer], { type: 'audio/wav' });
   }, []);
 
-  const stopRecording = useCallback(async (): Promise<RecordingResult | null> => {
+  const stopRecording = useCallback(async (options?: StopRecordingOptions): Promise<RecordingResult | null> => {
     return new Promise((resolve) => {
       const recorder = mediaRecorderRef.current;
       if (!recorder || recorder.state === 'inactive') {
         resolve(null);
         return;
       }
+
+      const includeWav = options?.includeWav ?? true;
 
       recorder.onstop = async () => {
         const finalDuration = (Date.now() - startTimeRef.current) / 1000;
@@ -172,12 +174,14 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
           setError('录音时间太短，请重试');
           resolve(null);
         } else {
-          let wavBlob: Blob;
-          try {
-            wavBlob = await convertToWav(webmBlob);
-          } catch (e) {
-            console.warn('WAV conversion failed, using webm as fallback:', e);
-            wavBlob = webmBlob;
+          let wavBlob: Blob = webmBlob;
+          if (includeWav) {
+            try {
+              wavBlob = await convertToWav(webmBlob);
+            } catch (e) {
+              console.warn('WAV conversion failed, using webm as fallback:', e);
+              wavBlob = webmBlob;
+            }
           }
           resolve({ webmBlob, wavBlob, blob: wavBlob, duration: finalDuration });
         }
