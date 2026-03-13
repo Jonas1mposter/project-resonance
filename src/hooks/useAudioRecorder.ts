@@ -10,11 +10,16 @@ interface RecordingResult {
   duration: number;
 }
 
+interface StopRecordingOptions {
+  /** Whether to generate WAV (CPU-heavy). Disable when only ASR is needed. */
+  includeWav?: boolean;
+}
+
 interface UseAudioRecorderReturn {
   isRecording: boolean;
   duration: number;
   startRecording: () => Promise<void>;
-  stopRecording: () => Promise<RecordingResult | null>;
+  stopRecording: (options?: StopRecordingOptions) => Promise<RecordingResult | null>;
   error: string | null;
   audioLevel: number;
 }
