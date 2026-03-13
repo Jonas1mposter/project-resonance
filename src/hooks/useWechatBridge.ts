@@ -127,11 +127,11 @@ export function useWechatBridge(): WechatBridgeReturn {
   }, [isWechat]);
 
   const startNativeRecording = useCallback(() => {
-    console.log('[WechatBridge] startNativeRecording called, isWechat:', isWechat, 'wx:', !!window.wx, 'miniProgram:', !!window.wx?.miniProgram);
+    const debugInfo = getWechatDebugInfo();
+    console.log('[WechatBridge] startNativeRecording called', debugInfo);
 
     if (!window.wx?.miniProgram) {
       console.error('[WechatBridge] wx.miniProgram not available');
-      // Show user-visible error
       alert('微信录音桥接不可用，请确认在微信小程序中打开');
       return;
     }
@@ -141,44 +141,57 @@ export function useWechatBridge(): WechatBridgeReturn {
     setTranscript(null);
     setRecordDuration(0);
 
-    // postMessage for mini program side (received on lifecycle events)
-    window.wx.miniProgram.postMessage({ data: { type: 'startRecord' } });
+    // Send message first (will be received on lifecycle events)
+    try {
+      window.wx.miniProgram.postMessage({ data: { type: 'startRecord' } });
+    } catch (e) {
+      console.warn('[WechatBridge] postMessage failed:', e);
+    }
 
-    const paths = ['/pages/record/record', 'pages/record/record'];
-    let tried = 0;
+    // Navigate to native record page
+    const url = '/pages/record/record';
+    console.log('[WechatBridge] Calling navigateTo:', url);
 
-    const tryNavigate = () => {
-      if (tried >= paths.length) {
-        // All paths failed, try redirectTo as last resort
-        console.error('[WechatBridge] All navigateTo paths failed, trying redirectTo');
-        window.wx?.miniProgram?.redirectTo?.({
-          url: '/pages/record/record',
-          fail: (err: unknown) => {
-            console.error('[WechatBridge] redirectTo also failed:', err);
-            alert('无法打开录音页面，请重新进入小程序重试');
-          },
-        });
-        return;
-      }
+    let navigated = false;
 
-      const url = paths[tried];
-      tried++;
-      console.log('[WechatBridge] Trying navigateTo:', url);
-
-      window.wx?.miniProgram?.navigateTo({
+    try {
+      window.wx.miniProgram.navigateTo({
         url,
         success: () => {
-          console.log('[WechatBridge] navigateTo succeeded:', url);
+          navigated = true;
+          console.log('[WechatBridge] navigateTo succeeded');
         },
         fail: (err: unknown) => {
-          console.error('[WechatBridge] navigateTo failed:', url, err);
-          tryNavigate();
+          navigated = true;
+          console.error('[WechatBridge] navigateTo failed:', err);
+          // Try redirectTo as fallback
+          try {
+            window.wx?.miniProgram?.redirectTo?.({
+              url,
+              fail: (err2: unknown) => {
+                console.error('[WechatBridge] redirectTo also failed:', err2);
+                alert('无法打开录音页面 (navigateTo+redirectTo 均失败)\n' + JSON.stringify(err));
+              },
+            });
+          } catch (e2) {
+            alert('无法打开录音页面: ' + String(e2));
+          }
         },
       });
-    };
+    } catch (e) {
+      console.error('[WechatBridge] navigateTo threw:', e);
+      alert('navigateTo 异常: ' + String(e));
+      return;
+    }
 
-    tryNavigate();
-  }, [isWechat]);
+    // Timeout fallback: if no callback fires within 3s, show alert
+    setTimeout(() => {
+      if (!navigated) {
+        console.warn('[WechatBridge] navigateTo callback not fired within 3s');
+        alert('录音页面可能未打开（3秒无响应）\n请检查小程序是否包含 pages/record/record 页面\n\n调试: ' + JSON.stringify(debugInfo));
+      }
+    }, 3000);
+  }, []);
 
   const clearTranscript = useCallback(() => {
     setTranscript(null);
