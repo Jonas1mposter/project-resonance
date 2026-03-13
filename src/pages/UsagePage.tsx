@@ -59,8 +59,14 @@ export default function UsagePage({
 
   const handleStart = useCallback(async () => {
     if (isWechat) {
-      // In WeChat Mini Program, use native recording
+      // In WeChat Mini Program, use native recording via bridge
+      console.log('[UsagePage] WeChat detected, starting native recording');
       startNativeRecording();
+      return;
+    }
+    // Check if getUserMedia is available (not available in some WebViews)
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast.error('当前环境不支持录音，请在微信小程序或现代浏览器中使用');
       return;
     }
     setFlowState('recording');

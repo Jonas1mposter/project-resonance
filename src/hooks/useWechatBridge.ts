@@ -113,37 +113,57 @@ export function useWechatBridge(): WechatBridgeReturn {
   }, [isWechat]);
 
   const startNativeRecording = useCallback(() => {
-    if (!isWechat || !window.wx?.miniProgram) return;
+    console.log('[WechatBridge] startNativeRecording called, isWechat:', isWechat, 'wx:', !!window.wx, 'miniProgram:', !!window.wx?.miniProgram);
+
+    if (!window.wx?.miniProgram) {
+      console.error('[WechatBridge] wx.miniProgram not available');
+      // Show user-visible error
+      alert('微信录音桥接不可用，请确认在微信小程序中打开');
+      return;
+    }
 
     // Reset state
     initialChecked.current = false;
     setTranscript(null);
     setRecordDuration(0);
 
-    // Keep postMessage for compatibility/analytics on mini program side
+    // postMessage for mini program side (received on lifecycle events)
     window.wx.miniProgram.postMessage({ data: { type: 'startRecord' } });
 
-    const openRecordPage = (url: string, fallback?: () => void) => {
+    const paths = ['/pages/record/record', 'pages/record/record'];
+    let tried = 0;
+
+    const tryNavigate = () => {
+      if (tried >= paths.length) {
+        // All paths failed, try redirectTo as last resort
+        console.error('[WechatBridge] All navigateTo paths failed, trying redirectTo');
+        window.wx?.miniProgram?.redirectTo?.({
+          url: '/pages/record/record',
+          fail: (err: unknown) => {
+            console.error('[WechatBridge] redirectTo also failed:', err);
+            alert('无法打开录音页面，请重新进入小程序重试');
+          },
+        });
+        return;
+      }
+
+      const url = paths[tried];
+      tried++;
+      console.log('[WechatBridge] Trying navigateTo:', url);
+
       window.wx?.miniProgram?.navigateTo({
         url,
-        fail: (err) => {
+        success: () => {
+          console.log('[WechatBridge] navigateTo succeeded:', url);
+        },
+        fail: (err: unknown) => {
           console.error('[WechatBridge] navigateTo failed:', url, err);
-          fallback?.();
+          tryNavigate();
         },
       });
     };
 
-    // Try absolute path first, then relative path, finally redirectTo fallback
-    openRecordPage('/pages/record/record', () => {
-      openRecordPage('pages/record/record', () => {
-        window.wx?.miniProgram?.redirectTo?.({
-          url: '/pages/record/record',
-          fail: (err) => {
-            console.error('[WechatBridge] redirectTo failed:', err);
-          },
-        });
-      });
-    });
+    tryNavigate();
   }, [isWechat]);
 
   const clearTranscript = useCallback(() => {
