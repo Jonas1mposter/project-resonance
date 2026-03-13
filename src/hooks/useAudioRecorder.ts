@@ -91,7 +91,7 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
-      mediaRecorder.start(100);
+      mediaRecorder.start(250);
       startTimeRef.current = Date.now();
       setIsRecording(true);
       setDuration(0);
