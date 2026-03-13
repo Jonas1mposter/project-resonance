@@ -81,6 +81,8 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
         mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
           ? 'audio/webm;codecs=opus'
           : 'audio/webm',
+        // Lower bitrate = smaller upload payload for faster ASR
+        audioBitsPerSecond: 24000,
       });
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
