@@ -329,6 +329,16 @@ export default function UsagePage({
           {recError || asrError || ttsError}
         </div>
       )}
+
+      {/* Debug info - visible only in development or WeChat for troubleshooting */}
+      {(isWechat || import.meta.env.DEV) && (
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer">调试信息</summary>
+          <pre className="mt-1 rounded bg-muted p-2 overflow-auto max-h-32">
+            {JSON.stringify(getWechatDebugInfo(), null, 2)}
+          </pre>
+        </details>
+      )}
     </section>
   );
 }
