@@ -112,11 +112,6 @@ export function useStepfunTTS(): UseStepfunTTSReturn {
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Pre-warm edge functions on first mount
-  useEffect(() => {
-    prewarmEdgeFunctions();
-  }, []);
-
   const setVoiceId = useCallback((id: string | null) => {
     setVoiceIdState(id);
     try {
