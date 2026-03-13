@@ -2,10 +2,11 @@
  * StepFun TTS Edge Function
  *
  * Generates speech audio using StepFun TTS API (step-tts-mini model).
+ * Streams the audio response directly to the client for lower latency.
  *
  * POST /stepfun-tts
  *   Body JSON: { "text": "...", "voice": "voice-id", "speed": 1.0, "volume": 1.0 }
- *   Returns: audio/mpeg binary
+ *   Returns: audio/mpeg binary (streamed)
  */
 
 const corsHeaders = {
@@ -82,16 +83,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // StepFun returns audio binary directly
-    const audioBytes = new Uint8Array(await response.arrayBuffer());
-    console.log("[stepfun-tts] Generated audio, size:", audioBytes.byteLength);
-
-    return new Response(audioBytes, {
+    // Stream response body directly — no buffering, lower TTFB
+    return new Response(response.body, {
       status: 200,
       headers: {
         ...corsHeaders,
         "Content-Type": "audio/mpeg",
-        "Content-Length": String(audioBytes.byteLength),
+        "Transfer-Encoding": "chunked",
       },
     });
   } catch (err) {
