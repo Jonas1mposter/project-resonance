@@ -59,7 +59,7 @@ async function playStreamingAudio(
               break;
             }
             if (value) {
-              await appendChunk(new Uint8Array(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength)));
+              await appendChunk(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength) as ArrayBuffer);
               // Start playback after first chunk is buffered
               if (!started) {
                 started = true;
