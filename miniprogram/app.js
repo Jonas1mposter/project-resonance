@@ -1,6 +1,7 @@
 App({
   globalData: {
-    webviewUrl: 'https://project-resonance.lovable.app',
+    // Add cache-busting to avoid stale H5 bundle in WeChat WebView
+    webviewUrl: `https://project-resonance.lovable.app?mp=1&t=${Date.now()}`,
     lastTranscript: '',
     lastRecordFilePath: '',
     lastRecordDuration: 0,
