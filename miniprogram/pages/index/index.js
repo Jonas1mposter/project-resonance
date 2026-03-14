@@ -24,13 +24,43 @@ Page({
   },
 
   goRecordDirect() {
-    wx.navigateTo({
-      url: '/pages/record/record',
-      fail(err) {
-        wx.showToast({ title: '录音页打开失败', icon: 'none' });
-        console.error('[GoRecord Error]', err);
+    wx.showLoading({ title: '打开录音页...' });
+
+    const paths = ['/pages/record/record', '../record/record'];
+
+    const tryOpen = (index) => {
+      if (index >= paths.length) {
+        wx.hideLoading();
+        wx.showModal({
+          title: '打开失败',
+          content: '无法进入录音页，请重启小程序后重试',
+          showCancel: false,
+        });
+        return;
       }
-    });
+
+      const url = paths[index];
+
+      wx.navigateTo({
+        url,
+        success: () => {
+          wx.hideLoading();
+        },
+        fail: (err) => {
+          console.error('[GoRecord navigateTo failed]:', url, err);
+          wx.redirectTo({
+            url,
+            success: () => wx.hideLoading(),
+            fail: (err2) => {
+              console.error('[GoRecord redirectTo failed]:', url, err2);
+              tryOpen(index + 1);
+            },
+          });
+        },
+      });
+    };
+
+    tryOpen(0);
   },
 
   onShareAppMessage() {
