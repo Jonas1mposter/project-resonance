@@ -46,7 +46,29 @@ Deno.serve(async (req) => {
     let formData: FormData;
 
     if (contentType.includes("multipart/form-data")) {
-      formData = await req.formData();
+      const incomingForm = await req.formData();
+      const file = incomingForm.get("file");
+      
+      // Ensure the file has a valid extension that StepFun accepts
+      // WeChat uploads may lack proper filename/extension
+      formData = new FormData();
+      if (file instanceof File) {
+        const originalName = file.name || "recording";
+        // If no valid audio extension, default to .mp3 (WeChat records in mp3)
+        const validExtensions = [".flac", ".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".ogg", ".wav", ".webm", ".aac", ".opus"];
+        const hasValidExt = validExtensions.some(ext => originalName.toLowerCase().endsWith(ext));
+        const fileName = hasValidExt ? originalName : "recording.mp3";
+        const blob = new Blob([await file.arrayBuffer()], { type: file.type || "audio/mpeg" });
+        formData.append("file", blob, fileName);
+      } else {
+        // Fallback: treat as raw bytes
+        const bytes = file ? new Blob([file as string], { type: "audio/mpeg" }) : null;
+        if (bytes) formData.append("file", bytes, "recording.mp3");
+      }
+      
+      // Copy other form fields
+      const incomingModel = incomingForm.get("model");
+      if (incomingModel) formData.append("model", incomingModel as string);
     } else {
       const audioBytes = await req.arrayBuffer();
       const blob = new Blob([audioBytes], { type: "audio/webm" });
