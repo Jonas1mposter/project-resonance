@@ -12,6 +12,10 @@
     进入应用
   </button>
 
+  <button class="record-shortcut-btn" bindtap="goRecordDirect">
+    🎙️ 直接录音（备用入口）
+  </button>
+
   <view class="features">
     <view class="feature-item">
       <text class="feature-icon">🎙️</text>
