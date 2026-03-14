@@ -136,10 +136,12 @@ Page({
     recorderManager.stop();
   },
 
-  _processRecording(filePath) {
-    this.setData({ state: 'processing', statusText: '正在识别语音...' });
+  _processRecording(filePath, retryCount) {
+    retryCount = retryCount || 0;
+    this.setData({ state: 'processing', statusText: retryCount > 0 ? `正在重试识别 (${retryCount}/2)...` : '正在识别语音...' });
 
-    // Upload to StepFun ASR edge function
+    console.log('[ASR] Uploading to:', `${SUPABASE_URL}/functions/v1/stepfun-asr`);
+
     wx.uploadFile({
       url: `${SUPABASE_URL}/functions/v1/stepfun-asr`,
       filePath: filePath,
@@ -149,28 +151,49 @@ Page({
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
       },
       success: (res) => {
-        console.log('[ASR] Response:', res.data);
+        console.log('[ASR] statusCode:', res.statusCode, 'data:', res.data);
         try {
           const data = JSON.parse(res.data);
+
+          if (data.error) {
+            const status = data.status || res.statusCode;
+            if ((status === 503 || status === 502) && retryCount < 2) {
+              console.log('[ASR] Service unavailable, retrying in 2s...');
+              setTimeout(() => this._processRecording(filePath, retryCount + 1), 2000);
+              return;
+            }
+            this.setData({
+              state: 'error',
+              errorMsg: `识别服务错误 (${status}): ${data.error}`,
+            });
+            return;
+          }
+
           const text = (data.text || '').trim();
           if (text) {
             this.setData({ state: 'result', transcript: text });
           } else {
-            this.setData({ state: 'result', transcript: '' });
+            this.setData({ state: 'result', transcript: '（未识别到语音内容）' });
           }
         } catch (e) {
-          console.error('[ASR] Parse error:', e);
+          console.error('[ASR] Parse error:', e, 'raw:', res.data);
           this.setData({
             state: 'error',
-            errorMsg: '识别结果解析失败',
+            errorMsg: '识别结果解析失败: ' + (res.data || '').slice(0, 100),
           });
         }
       },
       fail: (err) => {
-        console.error('[ASR] Upload error:', err);
+        console.error('[ASR] Upload error:', JSON.stringify(err));
+        let msg = '网络请求失败';
+        if (err.errMsg && err.errMsg.includes('url not in domain list')) {
+          msg = '域名未加入白名单。请在微信开发者工具中勾选「不校验合法域名」';
+        } else if (err.errMsg) {
+          msg = err.errMsg;
+        }
         this.setData({
           state: 'error',
-          errorMsg: '网络请求失败，请检查网络连接',
+          errorMsg: msg,
         });
       },
     });
