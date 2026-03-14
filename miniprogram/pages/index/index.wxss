@@ -75,22 +75,25 @@
 
 /* Record shortcut button */
 .record-shortcut-btn {
-  width: 80% !important;
+  width: 80%;
   height: 80rpx;
-  line-height: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 28rpx;
   font-weight: 500;
   border-radius: 40rpx;
-  background: #fff !important;
-  color: #4A9E94 !important;
-  border: 2rpx solid #4A9E94 !important;
+  background: #fff;
+  color: #4A9E94;
+  border: 2rpx solid #4A9E94;
   margin-bottom: 72rpx;
   margin-top: -40rpx;
   letter-spacing: 2rpx;
+  box-sizing: border-box;
 }
 
-.record-shortcut-btn::after {
-  border: none;
+.record-shortcut-btn-hover {
+  opacity: 0.88;
 }
 
 /* Features Grid */
