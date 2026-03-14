@@ -26,7 +26,7 @@ Page({
   goRecordDirect() {
     wx.showLoading({ title: '打开录音页...' });
 
-    const paths = ['/pages/record/index', '../record/index'];
+    const paths = ['/pages/record/index', '/pages/record/record', '../record/index', '../record/record'];
 
     const tryOpen = (index) => {
       if (index >= paths.length) {
