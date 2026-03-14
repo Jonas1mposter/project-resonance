@@ -3,8 +3,8 @@ import { useAppData } from '@/hooks/useAppData';
 import { useTTS } from '@/hooks/useTTS';
 import { useStepfunTTS } from '@/hooks/useStepfunTTS';
 import { useMemo, useState, useEffect, lazy, Suspense } from 'react';
+import UsagePage from './pages/UsagePage';
 
-const UsagePage = lazy(() => import('./pages/UsagePage'));
 const TrainingPage = lazy(() => import('./pages/TrainingPage'));
 const PhrasesPage = lazy(() => import('./pages/PhrasesPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
