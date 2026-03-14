@@ -1,5 +1,5 @@
 const app = getApp();
-const recorderManager = wx.getRecorderManager();
+let recorderManager = null;
 
 // Edge function URL for ASR
 const SUPABASE_URL = 'https://lwusdbovydwbltxmpctr.supabase.co';
@@ -16,21 +16,44 @@ Page({
     voiceCloned: false,
   },
 
-  onLoad(options) {
+  onLoad() {
     this.setData({
       voiceCloned: !!app.globalData.voiceCloned,
     });
-    this._setupRecorder();
+    this._initRecorder();
   },
 
   onUnload() {
-    if (this._timer) clearInterval(this._timer);
-    if (this.data.state === 'recording') {
+    if (this._timer) {
+      clearInterval(this._timer);
+      this._timer = null;
+    }
+
+    if (this.data.state === 'recording' && recorderManager) {
       recorderManager.stop();
     }
   },
 
+  _initRecorder() {
+    try {
+      if (!wx.getRecorderManager) {
+        throw new Error('RecorderManager API 不可用');
+      }
+
+      recorderManager = wx.getRecorderManager();
+      this._setupRecorder();
+    } catch (error) {
+      console.error('[Record] init recorder failed:', error);
+      this.setData({
+        state: 'error',
+        errorMsg: '当前环境暂不支持录音，请在真机微信中重试',
+      });
+    }
+  },
+
   _setupRecorder() {
+    if (!recorderManager) return;
+
     recorderManager.onStart(() => {
       console.log('[Record] Started');
       this._startTime = Date.now();
@@ -75,6 +98,14 @@ Page({
   },
 
   startRecord() {
+    if (!recorderManager) {
+      this.setData({
+        state: 'error',
+        errorMsg: '录音组件初始化失败，请重试',
+      });
+      return;
+    }
+
     wx.authorize({
       scope: 'scope.record',
       success: () => {
@@ -101,6 +132,7 @@ Page({
   },
 
   stopRecord() {
+    if (!recorderManager) return;
     recorderManager.stop();
   },
 
