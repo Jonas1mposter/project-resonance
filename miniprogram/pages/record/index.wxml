@@ -1,0 +1,57 @@
+<view class="record-page">
+  <!-- Idle state -->
+  <view wx:if="{{state === 'idle'}}" class="record-section">
+    <view class="hint-text">点击下方按钮开始录音</view>
+    <view wx:if="{{!voiceCloned}}" class="sub-hint">录制 10 秒以上可克隆音色</view>
+    <view class="record-btn" bindtap="startRecord">
+      <image src="/assets/mic-icon.svg" class="mic-icon" mode="aspectFit" />
+    </view>
+    <view class="label">开始录音</view>
+  </view>
+
+  <!-- Recording state -->
+  <view wx:if="{{state === 'recording'}}" class="record-section">
+    <view class="duration-display">{{formatDuration}}</view>
+    <view wx:if="{{!voiceCloned && duration < 10}}" class="sub-hint">已录 {{duration}}s / 10s（克隆音色需 10 秒）</view>
+    <view wx:if="{{!voiceCloned && duration >= 10}}" class="sub-hint success-hint">✓ 已满 10 秒，可克隆音色</view>
+    <view class="record-btn recording" bindtap="stopRecord">
+      <view class="stop-icon"></view>
+    </view>
+    <view class="label recording-label">
+      <view class="pulse-dot"></view>
+      录音中，点击停止
+    </view>
+  </view>
+
+  <!-- Processing state -->
+  <view wx:if="{{state === 'processing'}}" class="record-section">
+    <view class="spinner"></view>
+    <view class="status-text">{{statusText}}</view>
+  </view>
+
+  <!-- Result state -->
+  <view wx:if="{{state === 'result'}}" class="record-section">
+    <view wx:if="{{transcript}}" class="result-card">
+      <view class="result-label">识别结果</view>
+      <view class="result-text">{{transcript}}</view>
+    </view>
+    <view wx:else class="result-card error-card">
+      <view class="result-text">未能识别到语音内容</view>
+    </view>
+    <view class="btn-row">
+      <button class="action-btn primary-btn" bindtap="confirmResult">确认使用</button>
+      <button class="action-btn" bindtap="retryRecord">重新录制</button>
+    </view>
+  </view>
+
+  <!-- Error state -->
+  <view wx:if="{{state === 'error'}}" class="record-section">
+    <view class="result-card error-card">
+      <view class="result-text">{{errorMsg}}</view>
+    </view>
+    <view class="btn-row">
+      <button class="action-btn" bindtap="retryRecord">重试</button>
+      <button class="action-btn" bindtap="goBack">返回</button>
+    </view>
+  </view>
+</view>
