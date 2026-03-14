@@ -73,6 +73,26 @@
   border: none;
 }
 
+/* Record shortcut button */
+.record-shortcut-btn {
+  width: 80% !important;
+  height: 80rpx;
+  line-height: 80rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+  border-radius: 40rpx;
+  background: #fff !important;
+  color: #4A9E94 !important;
+  border: 2rpx solid #4A9E94 !important;
+  margin-bottom: 72rpx;
+  margin-top: -40rpx;
+  letter-spacing: 2rpx;
+}
+
+.record-shortcut-btn::after {
+  border: none;
+}
+
 /* Features Grid */
 .features {
   display: flex;

@@ -23,6 +23,16 @@ Page({
     });
   },
 
+  goRecordDirect() {
+    wx.navigateTo({
+      url: '/pages/record/record',
+      fail(err) {
+        wx.showToast({ title: '录音页打开失败', icon: 'none' });
+        console.error('[GoRecord Error]', err);
+      }
+    });
+  },
+
   onShareAppMessage() {
     return {
       title: '共鸣 - 构音障碍语音识别训练系统',
