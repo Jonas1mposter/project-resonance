@@ -19,12 +19,12 @@
   width: 140rpx;
   height: 140rpx;
   border-radius: 32rpx;
-  background: linear-gradient(135deg, #4A9E94, #3A8E84);
+  background: linear-gradient(135deg, #E8832A, #D4A017);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 28rpx;
-  box-shadow: 0 12rpx 32rpx rgba(74, 158, 148, 0.3);
+  box-shadow: 0 12rpx 32rpx rgba(232, 131, 42, 0.3);
 }
 
 .logo-icon {
@@ -61,11 +61,11 @@
   font-size: 34rpx;
   font-weight: 600;
   border-radius: 48rpx;
-  background: linear-gradient(135deg, #4A9E94, #3A8E84) !important;
+  background: linear-gradient(135deg, #E8832A, #D4A017) !important;
   color: #fff !important;
   margin-bottom: 72rpx;
   border: none !important;
-  box-shadow: 0 8rpx 24rpx rgba(74, 158, 148, 0.35);
+  box-shadow: 0 8rpx 24rpx rgba(232, 131, 42, 0.35);
   letter-spacing: 4rpx;
 }
 
@@ -84,8 +84,8 @@
   font-weight: 500;
   border-radius: 40rpx;
   background: #fff;
-  color: #4A9E94;
-  border: 2rpx solid #4A9E94;
+  color: #E8832A;
+  border: 2rpx solid #E8832A;
   margin-bottom: 72rpx;
   margin-top: -40rpx;
   letter-spacing: 2rpx;
@@ -112,7 +112,7 @@
   padding: 28rpx 12rpx;
   background: #fff;
   border-radius: 20rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4rpx 16rpx rgba(232, 131, 42, 0.08);
 }
 
 .feature-icon {
