@@ -3,7 +3,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #F7F4F0;
+  background: #FDF8F3;
   padding: 40rpx;
 }
 
@@ -27,18 +27,18 @@
 }
 
 .success-hint {
-  color: #22c55e;
+  color: #D4A017;
 }
 
 .record-btn {
   width: 180rpx;
   height: 180rpx;
   border-radius: 50%;
-  background: #4a9e8e;
+  background: #E8832A;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8rpx 24rpx rgba(74, 158, 142, 0.3);
+  box-shadow: 0 8rpx 24rpx rgba(232, 131, 42, 0.3);
   transition: transform 0.1s;
 }
 
@@ -105,8 +105,8 @@
 .spinner {
   width: 80rpx;
   height: 80rpx;
-  border: 6rpx solid rgba(74, 158, 142, 0.2);
-  border-top-color: #4a9e8e;
+  border: 6rpx solid rgba(232, 131, 42, 0.2);
+  border-top-color: #E8832A;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -126,7 +126,7 @@
   border-radius: 24rpx;
   padding: 40rpx;
   text-align: center;
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.06);
+  box-shadow: 0 4rpx 16rpx rgba(232, 131, 42, 0.08);
 }
 
 .error-card {
@@ -170,7 +170,7 @@
 }
 
 .primary-btn {
-  background: #4a9e8e;
+  background: #E8832A;
   color: #fff;
   border: none;
 }
