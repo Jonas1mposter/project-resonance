@@ -65,12 +65,12 @@ export default function Layout({ children }: LayoutProps) {
       >
         <div className="container flex h-12 md:h-14 items-center justify-between px-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary" aria-hidden="true">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/80 shadow-md shadow-primary/20" aria-hidden="true">
               <Mic className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold leading-tight text-foreground">共鸣</h1>
-              <p className="text-xs text-muted-foreground">Project Resonance</p>
+              <h1 className="text-lg font-bold leading-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">共鸣</h1>
+              <p className="text-[10px] text-muted-foreground tracking-wider uppercase">Project Resonance</p>
             </div>
           </div>
           <div className="hidden md:flex items-center gap-1">
