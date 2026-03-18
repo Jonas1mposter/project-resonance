@@ -111,15 +111,6 @@ export default function Layout({ children }: LayoutProps) {
             >
               <Keyboard className="h-4 w-4" aria-hidden="true" />
             </button>
-            {/* Logout */}
-            <button
-              onClick={signOut}
-              className="a11y-target rounded-lg p-2 text-muted-foreground hover:text-destructive hover:bg-muted transition-colors ml-1"
-              aria-label="退出登录"
-              title="退出登录"
-            >
-              <LogOut className="h-4 w-4" aria-hidden="true" />
-            </button>
           </div>
         </div>
       </header>
