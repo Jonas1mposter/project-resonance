@@ -7,7 +7,7 @@ import KeyboardShortcutsPanel from './KeyboardShortcutsPanel';
 import { useKeyboardShortcuts, useShortcutHelpPanel } from '@/hooks/useKeyboardShortcuts';
 import { useAccessibility } from '@/hooks/useAccessibility';
 import { shortcutGroups } from '@/data/shortcutGroups';
-import { useAuth } from '@/hooks/useAuth';
+
 
 interface LayoutProps {
   children: ReactNode;
