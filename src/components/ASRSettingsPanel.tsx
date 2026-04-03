@@ -1,4 +1,5 @@
-import { Settings, Zap, ShieldCheck } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Settings, Zap, ShieldCheck, Loader2 } from 'lucide-react';
 import { ASRSettings, DEFAULT_ASR_SETTINGS } from '@/types';
 
 interface ASRSettingsPanelProps {
@@ -6,7 +7,47 @@ interface ASRSettingsPanelProps {
   onUpdate: (settings: ASRSettings) => void;
 }
 
+type ServiceStatus = 'checking' | 'online' | 'offline';
+
 export default function ASRSettingsPanel({ settings, onUpdate }: ASRSettingsPanelProps) {
+  const [status, setStatus] = useState<ServiceStatus>('checking');
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      setStatus('checking');
+      try {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        if (!supabaseUrl) { setStatus('offline'); return; }
+
+        const res = await fetch(`${supabaseUrl}/functions/v1/whisper-asr`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'Content-Type': 'application/octet-stream',
+          },
+          body: new Uint8Array(0),
+        });
+
+        if (cancelled) return;
+        // 503 = WHISPER_API_URL not configured; 4xx/5xx from upstream = service is reachable
+        setStatus(res.status === 503 ? 'offline' : 'online');
+      } catch {
+        if (!cancelled) setStatus('offline');
+      }
+    };
+    check();
+    return () => { cancelled = true; };
+  }, []);
+
+  const statusConfig = {
+    checking: { label: '检测中…', icon: Loader2, className: 'text-muted-foreground bg-muted' },
+    online:   { label: '已连接',  icon: Zap,     className: 'text-green-700 bg-green-100 dark:text-green-400 dark:bg-green-900/30' },
+    offline:  { label: '待部署',  icon: Zap,     className: 'text-yellow-700 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30' },
+  }[status];
+
+  const StatusIcon = statusConfig.icon;
+
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-5">
       <div className="flex items-center justify-between">
@@ -14,13 +55,12 @@ export default function ASRSettingsPanel({ settings, onUpdate }: ASRSettingsPane
           <Settings className="h-4 w-4 text-primary" aria-hidden="true" />
           <h3 className="font-semibold text-foreground">语音识别配置</h3>
         </div>
-        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground">
-          <Zap className="h-3 w-3" aria-hidden="true" />
-          本地 Whisper（待部署）
+        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusConfig.className}`}>
+          <StatusIcon className={`h-3 w-3 ${status === 'checking' ? 'animate-spin' : ''}`} aria-hidden="true" />
+          本地 Whisper（{statusConfig.label}）
         </span>
       </div>
 
-      {/* API Status */}
       <div className="flex items-center gap-2 rounded-lg bg-muted/40 p-3">
         <ShieldCheck className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
         <p className="text-xs text-muted-foreground">
@@ -28,7 +68,6 @@ export default function ASRSettingsPanel({ settings, onUpdate }: ASRSettingsPane
         </p>
       </div>
 
-      {/* Reset */}
       <button
         onClick={() => onUpdate(DEFAULT_ASR_SETTINGS)}
         className="w-full rounded-lg border border-border py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors a11y-target"
