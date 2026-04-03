@@ -3,7 +3,6 @@ import { render } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import UsagePage from '../UsagePage';
 
-// Mock hooks
 vi.mock('@/hooks/useAudioRecorder', () => ({
   useAudioRecorder: () => ({
     isRecording: false,
@@ -43,24 +42,24 @@ vi.mock('@/hooks/useAccessibility', () => ({
   useAccessibility: () => ({ isMotionReduced: true }),
 }));
 
-vi.mock('framer-motion', () => ({
-  motion: {
-    div: ({ children, ...props }: any) => <div {...filterProps(props)}>{children}</div>,
-    button: ({ children, ...props }: any) => <button {...filterProps(props)}>{children}</button>,
-    span: ({ children, ...props }: any) => <span {...filterProps(props)}>{children}</span>,
-    p: ({ children, ...props }: any) => <p {...filterProps(props)}>{children}</p>,
-  },
-}));
-
-function filterProps(props: Record<string, any>) {
-  const filtered: Record<string, any> = {};
-  for (const [k, v] of Object.entries(props)) {
-    if (!['initial', 'animate', 'transition', 'whileTap', 'exit'].includes(k)) {
-      filtered[k] = v;
-    }
-  }
-  return filtered;
-}
+vi.mock('framer-motion', () => {
+  const forward = (tag: string) => {
+    const Comp = ({ children, ...props }: any) => {
+      const safe: Record<string, any> = {};
+      for (const [k, v] of Object.entries(props)) {
+        if (!['initial', 'animate', 'transition', 'whileTap', 'exit'].includes(k)) {
+          safe[k] = v;
+        }
+      }
+      const El = tag as any;
+      return <El {...safe}>{children}</El>;
+    };
+    return Comp;
+  };
+  return {
+    motion: { div: forward('div'), button: forward('button'), span: forward('span'), p: forward('p') },
+  };
+});
 
 describe('UsagePage', () => {
   const defaultProps = {
@@ -68,34 +67,37 @@ describe('UsagePage', () => {
     onStop: vi.fn(),
     isSpeaking: false,
     hasPromptAudio: false,
-    ttsError: null,
+    ttsError: null as string | null,
     onSetPromptAudio: vi.fn(),
     onClearPromptAudio: vi.fn(),
   };
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('renders idle state with record button', () => {
-    render(<UsagePage {...defaultProps} />);
-    expect(screen.getByText('语音识别')).toBeInTheDocument();
-    expect(screen.getByText('开始录音')).toBeInTheDocument();
+    const { getByText } = render(<UsagePage {...defaultProps} />);
+    expect(getByText('语音识别')).toBeInTheDocument();
+    expect(getByText('开始录音')).toBeInTheDocument();
   });
 
-  it('shows flow steps including "存音色" when no prompt audio', () => {
-    render(<UsagePage {...defaultProps} />);
-    expect(screen.getByText('存音色')).toBeInTheDocument();
-    expect(screen.getByText('朗读')).toBeInTheDocument();
+  it('shows "存音色" step when no prompt audio', () => {
+    const { getByText } = render(<UsagePage {...defaultProps} />);
+    expect(getByText('存音色')).toBeInTheDocument();
+    expect(getByText('朗读')).toBeInTheDocument();
   });
 
   it('shows "✓ 音色" when prompt audio exists', () => {
-    render(<UsagePage {...defaultProps} hasPromptAudio={true} />);
-    expect(screen.getByText('✓ 音色')).toBeInTheDocument();
+    const { getByText } = render(<UsagePage {...defaultProps} hasPromptAudio={true} />);
+    expect(getByText('✓ 音色')).toBeInTheDocument();
   });
 
-  it('does NOT auto-speak (no speaking state on mount)', () => {
+  it('does NOT auto-speak on mount', () => {
     render(<UsagePage {...defaultProps} />);
     expect(defaultProps.onSpeak).not.toHaveBeenCalled();
+  });
+
+  it('shows error when ttsError is set', () => {
+    const { getByText } = render(<UsagePage {...defaultProps} ttsError="TTS 播放失败" />);
+    expect(getByText('TTS 播放失败')).toBeInTheDocument();
   });
 });
