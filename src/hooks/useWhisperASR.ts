@@ -1,19 +1,14 @@
 import { useState, useCallback } from 'react';
 
-interface UseStepfunASRReturn {
-  /** Transcribed text */
+interface UseWhisperASRReturn {
   finalText: string;
-  /** Whether transcription is in progress */
   isProcessing: boolean;
-  /** Error message if any */
   error: string | null;
-  /** Send recorded audio blob to StepFun for transcription */
   transcribe: (audioBlob: Blob) => Promise<string | null>;
-  /** Reset state */
   reset: () => void;
 }
 
-export function useStepfunASR(): UseStepfunASRReturn {
+export function useWhisperASR(): UseWhisperASRReturn {
   const [finalText, setFinalText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,9 +26,8 @@ export function useStepfunASR(): UseStepfunASRReturn {
 
       const formData = new FormData();
       formData.append('file', audioBlob, 'recording.webm');
-      formData.append('model', 'step-asr');
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/stepfun-asr`, {
+      const response = await fetch(`${supabaseUrl}/functions/v1/whisper-asr`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
@@ -48,7 +42,7 @@ export function useStepfunASR(): UseStepfunASRReturn {
 
       const data = await response.json();
       const text = data.text?.trim() || '';
-      
+
       if (text) {
         setFinalText(text);
       } else {
@@ -71,11 +65,5 @@ export function useStepfunASR(): UseStepfunASRReturn {
     setError(null);
   }, []);
 
-  return {
-    finalText,
-    isProcessing,
-    error,
-    transcribe,
-    reset,
-  };
+  return { finalText, isProcessing, error, transcribe, reset };
 }
