@@ -35,7 +35,7 @@ describe('ASRStreamingResult', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it('shows "朗读" and "存为音色" when no prompt audio', () => {
-    const { getByText, getByLabelText } = render(
+    const { getByText } = render(
       <ASRStreamingResult {...base} hasPromptAudio={false} onSaveVoice={vi.fn()} onClearVoice={vi.fn()} />
     );
     expect(getByText('朗读')).toBeInTheDocument();
