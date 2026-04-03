@@ -1,4 +1,4 @@
-import { useStepfunTTS } from '@/hooks/useStepfunTTS';
+import { useCosyVoiceTTS } from '@/hooks/useCosyVoiceTTS';
 import UsagePage from './UsagePage';
 
 const Index = () => {
@@ -6,23 +6,21 @@ const Index = () => {
     speak,
     stop,
     isSpeaking,
-    cloneVoice,
-    isCloning,
-    voiceId,
-    setVoiceId,
+    setPromptAudio,
+    clearPromptAudio,
+    hasPromptAudio,
     error: ttsError,
-  } = useStepfunTTS();
+  } = useCosyVoiceTTS();
 
   return (
     <UsagePage
       onSpeak={speak}
       onStop={stop}
       isSpeaking={isSpeaking}
-      voiceId={voiceId}
-      isCloning={isCloning}
+      hasPromptAudio={hasPromptAudio}
       ttsError={ttsError}
-      onCloneVoice={cloneVoice}
-      onClearVoice={() => setVoiceId(null)}
+      onSetPromptAudio={setPromptAudio}
+      onClearPromptAudio={clearPromptAudio}
     />
   );
 };
