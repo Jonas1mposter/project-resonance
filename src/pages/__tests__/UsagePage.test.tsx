@@ -101,8 +101,8 @@ describe('UsagePage', () => {
   });
 
   it('shows keyboard hint in idle state', () => {
-    const { getByText } = render(<UsagePage {...defaultProps} />);
-    expect(getByText('空格')).toBeInTheDocument();
+    const { getAllByText } = render(<UsagePage {...defaultProps} />);
+    expect(getAllByText('空格').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows flow step "存音色" when no prompt audio', () => {
