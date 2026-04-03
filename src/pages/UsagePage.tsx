@@ -12,14 +12,13 @@ import { toast } from 'sonner';
 import type { ASRSettings } from '@/types';
 
 interface UsagePageProps {
-  onSpeak: (text: string, overrideVoice?: string) => Promise<void>;
+  onSpeak: (text: string) => Promise<void>;
   onStop: () => void;
   isSpeaking: boolean;
-  voiceId: string | null;
-  isCloning: boolean;
+  hasPromptAudio: boolean;
   ttsError: string | null;
-  onCloneVoice: (audioBlob: Blob, referenceText?: string) => Promise<string | null>;
-  onClearVoice: () => void;
+  onSetPromptAudio: (blob: Blob, promptText?: string) => void;
+  onClearPromptAudio: () => void;
 }
 
 type FlowState = 'idle' | 'recording' | 'processing' | 'cloning' | 'speaking' | 'result';
