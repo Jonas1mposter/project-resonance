@@ -41,7 +41,7 @@ export default function UsagePage({
     error: asrError,
     transcribe,
     reset: resetASR,
-  } = useStepfunASR();
+  } = useWhisperASR();
 
   // Handle transcript received from WeChat native recording
   useEffect(() => {

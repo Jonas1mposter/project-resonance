@@ -24,22 +24,12 @@ export interface RecognitionResult {
 }
 
 export interface ASRSettings {
-  /** ASR provider: 'stepfun' or 'volcengine' */
-  provider: 'stepfun' | 'volcengine';
-  appKey: string;
-  accessKey: string;
-  resourceId: string;
-  proxyUrl: string;
-  mockMode: boolean;
+  /** ASR provider */
+  provider: 'whisper';
 }
 
 export const DEFAULT_ASR_SETTINGS: ASRSettings = {
-  provider: 'stepfun',
-  appKey: '',
-  accessKey: '',
-  resourceId: 'volc.bigasr.sauc.duration',
-  proxyUrl: '',
-  mockMode: false,
+  provider: 'whisper',
 };
 
 export interface AppSettings {

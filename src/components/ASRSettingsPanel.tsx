@@ -14,17 +14,17 @@ export default function ASRSettingsPanel({ settings, onUpdate }: ASRSettingsPane
           <Settings className="h-4 w-4 text-primary" aria-hidden="true" />
           <h3 className="font-semibold text-foreground">语音识别配置</h3>
         </div>
-        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-success/15 text-success">
+        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium bg-muted text-muted-foreground">
           <Zap className="h-3 w-3" aria-hidden="true" />
-          阶跃星辰
+          本地 Whisper（待部署）
         </span>
       </div>
 
       {/* API Status */}
       <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
-        <ShieldCheck className="h-4 w-4 text-success shrink-0" aria-hidden="true" />
+        <ShieldCheck className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
         <p className="text-xs text-muted-foreground">
-          API 密钥已在后端安全配置，使用 step-asr 模型进行语音转写
+          ASR 将使用本地部署的 Whisper 模型，通过后端函数代理转发请求
         </p>
       </div>
 
