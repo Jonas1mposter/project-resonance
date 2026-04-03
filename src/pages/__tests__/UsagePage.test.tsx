@@ -3,35 +3,50 @@ import { render } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import UsagePage from '../UsagePage';
 
+// ============ Mocks ============
+
+const mockStartRecording = vi.fn();
+const mockStopRecording = vi.fn().mockResolvedValue(null);
+const mockTranscribe = vi.fn().mockResolvedValue(null);
+const mockResetASR = vi.fn();
+const mockStartNativeRecording = vi.fn();
+const mockClearTranscript = vi.fn();
+
+let mockIsRecording = false;
+let mockRecError: string | null = null;
+let mockFinalText = '';
+let mockAsrError: string | null = null;
+let mockWxTranscript = '';
+
 vi.mock('@/hooks/useAudioRecorder', () => ({
   useAudioRecorder: () => ({
-    isRecording: false,
-    duration: 0,
-    startRecording: vi.fn(),
-    stopRecording: vi.fn().mockResolvedValue(null),
-    error: null,
-    audioLevel: 0,
+    isRecording: mockIsRecording,
+    duration: 3,
+    startRecording: mockStartRecording,
+    stopRecording: mockStopRecording,
+    error: mockRecError,
+    audioLevel: 0.5,
   }),
 }));
 
 vi.mock('@/hooks/useWhisperASR', () => ({
   useWhisperASR: () => ({
-    finalText: '',
+    finalText: mockFinalText,
     isProcessing: false,
-    error: null,
-    transcribe: vi.fn().mockResolvedValue(null),
-    reset: vi.fn(),
+    error: mockAsrError,
+    transcribe: mockTranscribe,
+    reset: mockResetASR,
   }),
 }));
 
 vi.mock('@/hooks/useWechatBridge', () => ({
   useWechatBridge: () => ({
     isWechat: false,
-    startNativeRecording: vi.fn(),
-    transcript: '',
-    clearTranscript: vi.fn(),
+    startNativeRecording: mockStartNativeRecording,
+    transcript: mockWxTranscript,
+    clearTranscript: mockClearTranscript,
   }),
-  getWechatDebugInfo: () => ({}),
+  getWechatDebugInfo: () => ({ env: 'test' }),
 }));
 
 vi.mock('@/hooks/useKeyboardShortcuts', () => ({
@@ -47,18 +62,14 @@ vi.mock('framer-motion', () => {
     const Comp = ({ children, ...props }: any) => {
       const safe: Record<string, any> = {};
       for (const [k, v] of Object.entries(props)) {
-        if (!['initial', 'animate', 'transition', 'whileTap', 'exit'].includes(k)) {
-          safe[k] = v;
-        }
+        if (!['initial', 'animate', 'transition', 'whileTap', 'exit'].includes(k)) safe[k] = v;
       }
       const El = tag as any;
       return <El {...safe}>{children}</El>;
     };
     return Comp;
   };
-  return {
-    motion: { div: forward('div'), button: forward('button'), span: forward('span'), p: forward('p') },
-  };
+  return { motion: { div: forward('div'), button: forward('button'), span: forward('span'), p: forward('p') } };
 });
 
 describe('UsagePage', () => {
@@ -72,32 +83,97 @@ describe('UsagePage', () => {
     onClearPromptAudio: vi.fn(),
   };
 
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockIsRecording = false;
+    mockRecError = null;
+    mockFinalText = '';
+    mockAsrError = null;
+    mockWxTranscript = '';
+  });
 
-  it('renders idle state with record button', () => {
+  // === Idle State ===
+
+  it('renders idle state with title and record button', () => {
     const { getByText } = render(<UsagePage {...defaultProps} />);
     expect(getByText('语音识别')).toBeInTheDocument();
     expect(getByText('开始录音')).toBeInTheDocument();
   });
 
-  it('shows "存音色" step when no prompt audio', () => {
+  it('shows keyboard hint in idle state', () => {
     const { getByText } = render(<UsagePage {...defaultProps} />);
-    expect(getByText('存音色')).toBeInTheDocument();
-    expect(getByText('朗读')).toBeInTheDocument();
+    expect(getByText('空格')).toBeInTheDocument();
   });
 
-  it('shows "✓ 音色" when prompt audio exists', () => {
+  it('shows flow step "存音色" when no prompt audio', () => {
+    const { getByText } = render(<UsagePage {...defaultProps} />);
+    expect(getByText('存音色')).toBeInTheDocument();
+  });
+
+  it('shows flow step "✓ 音色" when prompt audio exists', () => {
     const { getByText } = render(<UsagePage {...defaultProps} hasPromptAudio={true} />);
     expect(getByText('✓ 音色')).toBeInTheDocument();
   });
+
+  it('shows flow step labels: 录音, 识别, 朗读', () => {
+    const { getByText } = render(<UsagePage {...defaultProps} />);
+    expect(getByText('录音')).toBeInTheDocument();
+    expect(getByText('识别')).toBeInTheDocument();
+    expect(getByText('朗读')).toBeInTheDocument();
+  });
+
+  // === No Auto-speak ===
 
   it('does NOT auto-speak on mount', () => {
     render(<UsagePage {...defaultProps} />);
     expect(defaultProps.onSpeak).not.toHaveBeenCalled();
   });
 
-  it('shows error when ttsError is set', () => {
+  // === Error Display ===
+
+  it('shows ttsError', () => {
     const { getByText } = render(<UsagePage {...defaultProps} ttsError="TTS 播放失败" />);
     expect(getByText('TTS 播放失败')).toBeInTheDocument();
+  });
+
+  it('shows recording error', () => {
+    mockRecError = '麦克风权限被拒绝';
+    const { getByText } = render(<UsagePage {...defaultProps} />);
+    expect(getByText('麦克风权限被拒绝')).toBeInTheDocument();
+  });
+
+  it('shows ASR error', () => {
+    mockAsrError = '识别服务不可用';
+    const { getByText } = render(<UsagePage {...defaultProps} />);
+    expect(getByText('识别服务不可用')).toBeInTheDocument();
+  });
+
+  it('error has role="alert"', () => {
+    const { container } = render(<UsagePage {...defaultProps} ttsError="出错了" />);
+    const alert = container.querySelector('[role="alert"]');
+    expect(alert).toBeTruthy();
+    expect(alert?.textContent).toBe('出错了');
+  });
+
+  // === Debug Info ===
+
+  it('renders debug details in dev mode', () => {
+    const { getByText } = render(<UsagePage {...defaultProps} />);
+    expect(getByText('调试信息')).toBeInTheDocument();
+  });
+
+  // === Heading Accessibility ===
+
+  it('has h2 with correct id', () => {
+    const { container } = render(<UsagePage {...defaultProps} />);
+    const heading = container.querySelector('#usage-heading');
+    expect(heading).toBeTruthy();
+    expect(heading?.tagName).toBe('H2');
+  });
+
+  it('section has aria-labelledby pointing to heading', () => {
+    const { container } = render(<UsagePage {...defaultProps} />);
+    const section = container.querySelector('section');
+    expect(section?.getAttribute('aria-labelledby')).toBe('usage-heading');
   });
 });
