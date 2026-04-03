@@ -98,14 +98,13 @@ export default function AppRoutes() {
           path="/"
           element={
             <UsagePage
-              onSpeak={stepfunSpeak}
-              onStop={stepfunStop}
-              isSpeaking={stepfunIsSpeaking}
-              voiceId={voiceId}
-              isCloning={isCloning}
+              onSpeak={cosySpeak}
+              onStop={cosyStop}
+              isSpeaking={cosyIsSpeaking}
+              hasPromptAudio={hasPromptAudio}
               ttsError={ttsError}
-              onCloneVoice={cloneVoice}
-              onClearVoice={() => setVoiceId(null)}
+              onSetPromptAudio={setPromptAudio}
+              onClearPromptAudio={clearPromptAudio}
             />
           }
         />
