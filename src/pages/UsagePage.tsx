@@ -1,6 +1,6 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Mic, RotateCcw, Check, X } from 'lucide-react';
+import { Mic, RotateCcw } from 'lucide-react';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import { useWhisperASR } from '@/hooks/useWhisperASR';
 import { useWechatBridge, getWechatDebugInfo } from '@/hooks/useWechatBridge';
@@ -20,7 +20,7 @@ interface UsagePageProps {
   onClearPromptAudio: () => void;
 }
 
-type FlowState = 'idle' | 'recording' | 'processing' | 'speaking' | 'result';
+type FlowState = 'idle' | 'recording' | 'processing' | 'result';
 
 export default function UsagePage({
   onSpeak,
@@ -36,6 +36,9 @@ export default function UsagePage({
   const [lastTranscript, setLastTranscript] = useState('');
   const { isWechat, startNativeRecording, transcript: wxTranscript, clearTranscript } = useWechatBridge();
 
+  // Keep the last WAV blob for voice cloning
+  const lastWavBlobRef = useRef<Blob | null>(null);
+
   const {
     finalText,
     error: asrError,
@@ -47,74 +50,73 @@ export default function UsagePage({
   useEffect(() => {
     if (wxTranscript) {
       setLastTranscript(wxTranscript);
-      setFlowState('speaking');
-      onSpeak(wxTranscript).catch(() => {}).finally(() => setFlowState('result'));
+      setFlowState('result');
       clearTranscript();
     }
-  }, [wxTranscript, onSpeak, clearTranscript]);
+  }, [wxTranscript, clearTranscript]);
 
   const handleStart = useCallback(async () => {
     if (isWechat) {
-      console.log('[UsagePage] WeChat detected, starting native recording');
       startNativeRecording();
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia) {
       if (window.wx?.miniProgram) {
-        console.log('[UsagePage] No getUserMedia but wx bridge available, trying native recording');
         startNativeRecording();
         return;
       }
       toast.error('当前环境不支持录音，请在微信小程序或现代浏览器中使用');
-      console.error('[UsagePage] Debug info:', getWechatDebugInfo());
       return;
     }
     setFlowState('recording');
     setLastTranscript('');
+    lastWavBlobRef.current = null;
     await startRecording();
   }, [isWechat, startNativeRecording, startRecording]);
 
   const handleStop = useCallback(async () => {
     setFlowState('processing');
 
-    // Always include WAV for potential prompt audio storage
-    const result = await stopRecording({ includeWav: !hasPromptAudio });
+    const result = await stopRecording({ includeWav: true });
     if (!result) {
       setFlowState('idle');
       return;
     }
 
-    const { webmBlob, blob: wavBlob, duration: recDuration } = result;
+    const { webmBlob, blob: wavBlob } = result;
 
-    // Auto-save prompt audio for zero-shot cloning (≥5s, no existing prompt)
-    if (!hasPromptAudio && recDuration >= 5) {
-      onSetPromptAudio(wavBlob);
-      toast.success('已保存参考音频，后续将使用您的音色');
-    }
+    // Save WAV for potential voice cloning later
+    lastWavBlobRef.current = wavBlob;
 
     const text = await transcribe(webmBlob);
 
-    if (!text) {
-      setFlowState('result');
+    if (text) {
+      setLastTranscript(text);
+    }
+
+    // Go straight to result — no auto-speak
+    setFlowState('result');
+  }, [stopRecording, transcribe]);
+
+  const handleSaveVoice = useCallback(() => {
+    const wav = lastWavBlobRef.current;
+    if (!wav) {
+      toast.error('没有可用的录音，请重新录制');
       return;
     }
+    onSetPromptAudio(wav, lastTranscript || undefined);
+    toast.success('已保存参考音频，后续朗读将使用您的音色');
+  }, [onSetPromptAudio, lastTranscript]);
 
-    setLastTranscript(text);
-
-    // Auto-speak the transcribed text
-    setFlowState('speaking');
-    try {
-      await onSpeak(text);
-    } catch {
-      // TTS error handled by parent
-    }
-
-    setFlowState('result');
-  }, [stopRecording, hasPromptAudio, onSetPromptAudio, transcribe, onSpeak]);
+  const handleClearVoice = useCallback(() => {
+    onClearPromptAudio();
+    toast.info('已清除参考音频');
+  }, [onClearPromptAudio]);
 
   const handleReset = useCallback(() => {
     setFlowState('idle');
     setLastTranscript('');
+    lastWavBlobRef.current = null;
     resetASR();
   }, [resetASR]);
 
@@ -123,6 +125,8 @@ export default function UsagePage({
       toast.success('已复制到剪贴板');
     });
   }, []);
+
+  const displayText = finalText || lastTranscript;
 
   // Keyboard shortcuts
   const shortcuts = useMemo(
@@ -146,25 +150,30 @@ export default function UsagePage({
       },
       {
         key: 't',
-        label: '复述',
-        description: '语音复述',
+        label: '朗读',
+        description: '朗读识别结果',
         handler: () => {
-          const text = finalText || lastTranscript;
-          if (text) {
-            if (isSpeaking) { onStop(); } else { onSpeak(text); }
+          if (displayText) {
+            if (isSpeaking) { onStop(); } else { onSpeak(displayText); }
           }
         },
-        enabled: flowState === 'result' && !!(finalText || lastTranscript),
+        enabled: flowState === 'result' && !!displayText,
+      },
+      {
+        key: 's',
+        label: '存音色',
+        description: '保存当前录音为音色',
+        handler: handleSaveVoice,
+        enabled: flowState === 'result' && !hasPromptAudio && !!lastWavBlobRef.current,
       },
       {
         key: 'c',
         label: '复制',
         description: '复制文本',
         handler: () => {
-          const text = finalText || lastTranscript;
-          if (text) handleCopy(text);
+          if (displayText) handleCopy(displayText);
         },
-        enabled: flowState === 'result' && !!(finalText || lastTranscript),
+        enabled: flowState === 'result' && !!displayText,
       },
       {
         key: 'Escape',
@@ -180,13 +189,11 @@ export default function UsagePage({
         enabled: flowState === 'recording',
       },
     ],
-    [flowState, handleStart, handleStop, handleReset, handleCopy, finalText, lastTranscript, isSpeaking, onSpeak, onStop, stopRecording, resetASR]
+    [flowState, handleStart, handleStop, handleReset, handleCopy, handleSaveVoice, displayText, hasPromptAudio, isSpeaking, onSpeak, onStop, stopRecording, resetASR]
   );
 
   useKeyboardShortcuts(shortcuts, 'high');
   const { isMotionReduced } = useAccessibility();
-
-  const displayText = finalText || lastTranscript;
 
   return (
     <section className="max-w-lg mx-auto space-y-5 relative" aria-labelledby="usage-heading">
@@ -194,7 +201,7 @@ export default function UsagePage({
       <div className="pointer-events-none absolute -top-20 -left-20 h-40 w-40 rounded-full bg-primary/8 blur-3xl" aria-hidden="true" />
       <div className="pointer-events-none absolute -top-10 -right-16 h-32 w-32 rounded-full bg-accent/10 blur-3xl" aria-hidden="true" />
 
-      {/* Header with gradient text */}
+      {/* Header */}
       <div className="text-center">
         <motion.div
           initial={isMotionReduced ? {} : { opacity: 0, y: -10 }}
@@ -209,30 +216,12 @@ export default function UsagePage({
             <span className="text-muted-foreground/40">→</span>
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">识别</span>
             <span className="text-muted-foreground/40">→</span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">克隆</span>
-            <span className="text-muted-foreground/40">→</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-medium text-accent">
+              {hasPromptAudio ? '✓ 音色' : '存音色'}
+            </span>
+            <span className="text-muted-foreground/40">/</span>
             <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">朗读</span>
           </div>
-          {hasPromptAudio && (
-            <motion.span
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-success/15 to-success/5 border border-success/20 px-3 py-1 text-xs font-medium text-success"
-            >
-              <Check className="h-3.5 w-3.5" />
-              音色已保存
-              <button
-                onClick={() => {
-                  onClearPromptAudio();
-                  toast.info('已清除参考音频，下次录音将重新保存');
-                }}
-                className="ml-0.5 rounded-full p-0.5 text-success/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                aria-label="清除参考音频"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </motion.span>
-          )}
         </motion.div>
       </div>
 
@@ -247,7 +236,6 @@ export default function UsagePage({
           <span>按</span>
           <kbd className="kbd-hint">空格</kbd>
           <span>开始录音</span>
-          {!hasPromptAudio && <span className="text-muted-foreground/50">（≥5s 自动保存音色）</span>}
         </motion.div>
       )}
 
@@ -271,28 +259,12 @@ export default function UsagePage({
               onStop={handleStop}
               size="lg"
             />
-            {isRecording && !hasPromptAudio && (
-              <motion.p
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-3 text-xs text-muted-foreground"
-              >
-                {duration >= 5 ? (
-                  <span className="inline-flex items-center gap-1 text-success font-medium">
-                    <Check className="h-3 w-3" />
-                    已满 5 秒，可保存音色
-                  </span>
-                ) : (
-                  <span className="tabular-nums">已录 {duration}s / 5s（保存音色需 5 秒）</span>
-                )}
-              </motion.p>
-            )}
           </div>
         </motion.div>
       )}
 
-      {/* Processing / Speaking states */}
-      {(flowState === 'processing' || flowState === 'speaking') && (
+      {/* Processing state */}
+      {flowState === 'processing' && (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -307,20 +279,12 @@ export default function UsagePage({
             <div className="absolute inset-0 rounded-full border-[3px] border-primary/20" aria-hidden="true" />
             <div className="absolute inset-0 rounded-full border-[3px] border-primary border-t-transparent animate-spin" aria-hidden="true" />
           </div>
-          <p className="relative text-foreground font-semibold">
-            {flowState === 'processing' && '正在识别语音...'}
-            {flowState === 'speaking' && '正在朗读...'}
-          </p>
-          {flowState === 'processing' && (
-            <p className="relative text-xs text-muted-foreground animate-pulse">正在上传压缩音频</p>
-          )}
-          {flowState === 'speaking' && displayText && (
-            <p className="relative text-sm text-muted-foreground italic">「{displayText}」</p>
-          )}
+          <p className="relative text-foreground font-semibold">正在识别语音...</p>
+          <p className="relative text-xs text-muted-foreground animate-pulse">正在上传压缩音频</p>
         </motion.div>
       )}
 
-      {/* Results */}
+      {/* Results — user chooses action */}
       {flowState === 'result' && (
         <>
           {displayText ? (
@@ -330,6 +294,9 @@ export default function UsagePage({
               onSpeak={onSpeak}
               onStop={onStop}
               isSpeaking={isSpeaking}
+              hasPromptAudio={hasPromptAudio}
+              onSaveVoice={handleSaveVoice}
+              onClearVoice={handleClearVoice}
             />
           ) : (
             <motion.div
