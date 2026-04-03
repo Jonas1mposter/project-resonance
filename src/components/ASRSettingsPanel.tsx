@@ -21,7 +21,7 @@ export default function ASRSettingsPanel({ settings, onUpdate }: ASRSettingsPane
       </div>
 
       {/* API Status */}
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-3">
+      <div className="flex items-center gap-2 rounded-lg bg-muted/40 p-3">
         <ShieldCheck className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
         <p className="text-xs text-muted-foreground">
           ASR 将使用本地部署的 Whisper 模型，通过后端函数代理转发请求
