@@ -56,15 +56,14 @@ export default function AppRoutes() {
   );
 
   const {
-    speak: stepfunSpeak,
-    stop: stepfunStop,
-    isSpeaking: stepfunIsSpeaking,
-    cloneVoice,
-    isCloning,
-    voiceId,
-    setVoiceId,
+    speak: cosySpeak,
+    stop: cosyStop,
+    isSpeaking: cosyIsSpeaking,
+    setPromptAudio,
+    clearPromptAudio,
+    hasPromptAudio,
     error: ttsError,
-  } = useStepfunTTS();
+  } = useCosyVoiceTTS();
 
   const trainedCount = useMemo(
     () => phrases.filter((p) => p.enabled && p.recordingCount >= 2).length,
