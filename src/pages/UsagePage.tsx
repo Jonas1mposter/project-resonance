@@ -9,7 +9,6 @@ import ASRStreamingResult from '@/components/ASRStreamingResult';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAccessibility } from '@/hooks/useAccessibility';
 import { toast } from 'sonner';
-import type { ASRSettings } from '@/types';
 
 interface UsagePageProps {
   onSpeak: (text: string) => Promise<void>;
@@ -21,7 +20,7 @@ interface UsagePageProps {
   onClearPromptAudio: () => void;
 }
 
-type FlowState = 'idle' | 'recording' | 'processing' | 'cloning' | 'speaking' | 'result';
+type FlowState = 'idle' | 'recording' | 'processing' | 'speaking' | 'result';
 
 export default function UsagePage({
   onSpeak,
@@ -35,11 +34,10 @@ export default function UsagePage({
   const { isRecording, duration, startRecording, stopRecording, error: recError, audioLevel } = useAudioRecorder();
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [lastTranscript, setLastTranscript] = useState('');
-  const { isWechat, startNativeRecording, transcript: wxTranscript, recordDuration: wxDuration, clearTranscript } = useWechatBridge();
+  const { isWechat, startNativeRecording, transcript: wxTranscript, clearTranscript } = useWechatBridge();
 
   const {
     finalText,
-    isProcessing,
     error: asrError,
     transcribe,
     reset: resetASR,
@@ -61,7 +59,6 @@ export default function UsagePage({
       startNativeRecording();
       return;
     }
-    // Fallback: if getUserMedia unavailable but wx.miniProgram exists, try native bridge anyway
     if (!navigator.mediaDevices?.getUserMedia) {
       if (window.wx?.miniProgram) {
         console.log('[UsagePage] No getUserMedia but wx bridge available, trying native recording');
@@ -78,11 +75,10 @@ export default function UsagePage({
   }, [isWechat, startNativeRecording, startRecording]);
 
   const handleStop = useCallback(async () => {
-    // Immediately show processing state for instant feedback
     setFlowState('processing');
 
-    // Skip CPU-heavy WAV conversion when voice is already cloned
-    const result = await stopRecording({ includeWav: !voiceId });
+    // Always include WAV for potential prompt audio storage
+    const result = await stopRecording({ includeWav: !hasPromptAudio });
     if (!result) {
       setFlowState('idle');
       return;
@@ -90,14 +86,10 @@ export default function UsagePage({
 
     const { webmBlob, blob: wavBlob, duration: recDuration } = result;
 
-    // Voice cloning is non-blocking: do it in background, never delay ASR -> TTS
-    const shouldClone = !voiceId && recDuration >= 10;
-    if (shouldClone) {
-      void onCloneVoice(wavBlob)
-        .then((vid) => {
-          if (vid) toast.success('音色克隆成功');
-        })
-        .catch(() => null);
+    // Auto-save prompt audio for zero-shot cloning (≥5s, no existing prompt)
+    if (!hasPromptAudio && recDuration >= 5) {
+      onSetPromptAudio(wavBlob);
+      toast.success('已保存参考音频，后续将使用您的音色');
     }
 
     const text = await transcribe(webmBlob);
@@ -109,7 +101,7 @@ export default function UsagePage({
 
     setLastTranscript(text);
 
-    // Auto-speak the transcribed text immediately
+    // Auto-speak the transcribed text
     setFlowState('speaking');
     try {
       await onSpeak(text);
@@ -118,7 +110,7 @@ export default function UsagePage({
     }
 
     setFlowState('result');
-  }, [stopRecording, voiceId, onCloneVoice, transcribe, onSpeak]);
+  }, [stopRecording, hasPromptAudio, onSetPromptAudio, transcribe, onSpeak]);
 
   const handleReset = useCallback(() => {
     setFlowState('idle');
@@ -159,7 +151,7 @@ export default function UsagePage({
         handler: () => {
           const text = finalText || lastTranscript;
           if (text) {
-            isSpeaking ? onStop() : onSpeak(text);
+            if (isSpeaking) { onStop(); } else { onSpeak(text); }
           }
         },
         enabled: flowState === 'result' && !!(finalText || lastTranscript),
@@ -221,21 +213,21 @@ export default function UsagePage({
             <span className="text-muted-foreground/40">→</span>
             <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">朗读</span>
           </div>
-          {voiceId && (
+          {hasPromptAudio && (
             <motion.span
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-success/15 to-success/5 border border-success/20 px-3 py-1 text-xs font-medium text-success"
             >
               <Check className="h-3.5 w-3.5" />
-              音色已克隆
+              音色已保存
               <button
                 onClick={() => {
-                  onClearVoice();
-                  toast.info('已清除克隆音色，下次录音将重新克隆');
+                  onClearPromptAudio();
+                  toast.info('已清除参考音频，下次录音将重新保存');
                 }}
                 className="ml-0.5 rounded-full p-0.5 text-success/60 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                aria-label="清除克隆音色"
+                aria-label="清除参考音频"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -255,7 +247,7 @@ export default function UsagePage({
           <span>按</span>
           <kbd className="kbd-hint">空格</kbd>
           <span>开始录音</span>
-          {!voiceId && <span className="text-muted-foreground/50">（≥10s 自动克隆音色）</span>}
+          {!hasPromptAudio && <span className="text-muted-foreground/50">（≥5s 自动保存音色）</span>}
         </motion.div>
       )}
 
@@ -267,7 +259,6 @@ export default function UsagePage({
           transition={{ duration: 0.3 }}
           className="relative rounded-2xl border border-border/60 bg-gradient-to-b from-card to-card/80 p-6 md:p-8 shadow-lg shadow-primary/5 overflow-hidden"
         >
-          {/* Subtle inner glow when recording */}
           {isRecording && (
             <div className="absolute inset-0 bg-gradient-to-t from-recording/5 to-transparent pointer-events-none" aria-hidden="true" />
           )}
@@ -280,19 +271,19 @@ export default function UsagePage({
               onStop={handleStop}
               size="lg"
             />
-            {isRecording && !voiceId && (
+            {isRecording && !hasPromptAudio && (
               <motion.p
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="mt-3 text-xs text-muted-foreground"
               >
-                {duration >= 10 ? (
+                {duration >= 5 ? (
                   <span className="inline-flex items-center gap-1 text-success font-medium">
                     <Check className="h-3 w-3" />
-                    已满 10 秒，可克隆音色
+                    已满 5 秒，可保存音色
                   </span>
                 ) : (
-                  <span className="tabular-nums">已录 {duration}s / 10s（克隆音色需 10 秒）</span>
+                  <span className="tabular-nums">已录 {duration}s / 5s（保存音色需 5 秒）</span>
                 )}
               </motion.p>
             )}
@@ -300,8 +291,8 @@ export default function UsagePage({
         </motion.div>
       )}
 
-      {/* Processing / Cloning / Speaking states */}
-      {(flowState === 'processing' || flowState === 'cloning' || flowState === 'speaking') && (
+      {/* Processing / Speaking states */}
+      {(flowState === 'processing' || flowState === 'speaking') && (
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -318,13 +309,12 @@ export default function UsagePage({
           </div>
           <p className="relative text-foreground font-semibold">
             {flowState === 'processing' && '正在识别语音...'}
-            {flowState === 'cloning' && '正在克隆音色...'}
             {flowState === 'speaking' && '正在朗读...'}
           </p>
           {flowState === 'processing' && (
             <p className="relative text-xs text-muted-foreground animate-pulse">正在上传压缩音频</p>
           )}
-          {flowState !== 'processing' && displayText && (
+          {flowState === 'speaking' && displayText && (
             <p className="relative text-sm text-muted-foreground italic">「{displayText}」</p>
           )}
         </motion.div>
