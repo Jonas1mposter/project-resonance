@@ -27,11 +27,10 @@ export default function UsagePage({
   onSpeak,
   onStop,
   isSpeaking,
-  voiceId,
-  isCloning,
+  hasPromptAudio,
   ttsError,
-  onCloneVoice,
-  onClearVoice,
+  onSetPromptAudio,
+  onClearPromptAudio,
 }: UsagePageProps) {
   const { isRecording, duration, startRecording, stopRecording, error: recError, audioLevel } = useAudioRecorder();
   const [flowState, setFlowState] = useState<FlowState>('idle');
