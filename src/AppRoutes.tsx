@@ -1,7 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { useAppData } from '@/hooks/useAppData';
 import { useTTS } from '@/hooks/useTTS';
-import { useStepfunTTS } from '@/hooks/useStepfunTTS';
+import { useCosyVoiceTTS } from '@/hooks/useCosyVoiceTTS';
 import { useMemo, useState, useEffect, lazy, Suspense } from 'react';
 import UsagePage from './pages/UsagePage';
 
@@ -56,15 +56,14 @@ export default function AppRoutes() {
   );
 
   const {
-    speak: stepfunSpeak,
-    stop: stepfunStop,
-    isSpeaking: stepfunIsSpeaking,
-    cloneVoice,
-    isCloning,
-    voiceId,
-    setVoiceId,
+    speak: cosySpeak,
+    stop: cosyStop,
+    isSpeaking: cosyIsSpeaking,
+    setPromptAudio,
+    clearPromptAudio,
+    hasPromptAudio,
     error: ttsError,
-  } = useStepfunTTS();
+  } = useCosyVoiceTTS();
 
   const trainedCount = useMemo(
     () => phrases.filter((p) => p.enabled && p.recordingCount >= 2).length,
@@ -99,14 +98,13 @@ export default function AppRoutes() {
           path="/"
           element={
             <UsagePage
-              onSpeak={stepfunSpeak}
-              onStop={stepfunStop}
-              isSpeaking={stepfunIsSpeaking}
-              voiceId={voiceId}
-              isCloning={isCloning}
+              onSpeak={cosySpeak}
+              onStop={cosyStop}
+              isSpeaking={cosyIsSpeaking}
+              hasPromptAudio={hasPromptAudio}
               ttsError={ttsError}
-              onCloneVoice={cloneVoice}
-              onClearVoice={() => setVoiceId(null)}
+              onSetPromptAudio={setPromptAudio}
+              onClearPromptAudio={clearPromptAudio}
             />
           }
         />
