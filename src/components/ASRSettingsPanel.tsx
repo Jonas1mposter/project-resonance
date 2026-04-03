@@ -20,17 +20,19 @@ export default function ASRSettingsPanel({ settings, onUpdate }: ASRSettingsPane
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         if (!supabaseUrl) { setStatus('offline'); return; }
 
+        // Use a tiny JSON body to trigger the function without sending real audio.
+        // The function will return 503 if WHISPER_API_URL is not set (= offline),
+        // or another status if the upstream Whisper service is reachable (= online).
         const res = await fetch(`${supabaseUrl}/functions/v1/whisper-asr`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            'Content-Type': 'application/octet-stream',
+            'Content-Type': 'application/json',
           },
-          body: new Uint8Array(0),
+          body: JSON.stringify({ ping: true }),
         });
 
         if (cancelled) return;
-        // 503 = WHISPER_API_URL not configured; 4xx/5xx from upstream = service is reachable
         setStatus(res.status === 503 ? 'offline' : 'online');
       } catch {
         if (!cancelled) setStatus('offline');
