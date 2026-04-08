@@ -11,6 +11,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+/** Headers to bypass ngrok's browser interception page */
+const ngrokHeaders = { "ngrok-skip-browser-warning": "true" };
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -67,6 +70,7 @@ Deno.serve(async (req) => {
 
     const response = await fetch(endpoint, {
       method: "POST",
+      headers: { ...ngrokHeaders },
       body: formData,
     });
 
