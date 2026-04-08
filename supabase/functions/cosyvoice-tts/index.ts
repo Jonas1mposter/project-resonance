@@ -272,24 +272,34 @@ async function fetchHLSAudio(playlistUrl: string): Promise<Uint8Array | null> {
       continue;
     }
 
-  // Download all segments
-  const chunks: Uint8Array[] = [];
-  for (const seg of segments) {
-    const segUrl = seg.startsWith("http") ? seg : `${baseUrl}${seg}`;
-    const segRes = await fetch(segUrl, { headers: ngrokHeaders });
-    if (segRes.ok) {
-      chunks.push(new Uint8Array(await segRes.arrayBuffer()));
+    // Download all segments
+    const chunks: Uint8Array[] = [];
+    for (const seg of segments) {
+      const segUrl = seg.startsWith("http") ? seg : `${baseUrl}${seg}`;
+      const segRes = await fetch(segUrl, { headers: ngrokHeaders });
+      if (segRes.ok) {
+        chunks.push(new Uint8Array(await segRes.arrayBuffer()));
+      }
     }
+
+    // Concatenate
+    const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
+    if (totalLen < 500) {
+      // Suspiciously small audio - segments might be empty, retry
+      console.log("[cosyvoice-tts] Audio too small (", totalLen, "bytes), retrying...");
+      await new Promise(r => setTimeout(r, 2000));
+      continue;
+    }
+
+    const result = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return result;
   }
 
-  // Concatenate
-  const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
-  const result = new Uint8Array(totalLen);
-  let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  return result;
+  console.error("[cosyvoice-tts] HLS fetch exhausted retries");
+  return null;
 }
