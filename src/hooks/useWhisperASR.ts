@@ -35,12 +35,18 @@ export function useWhisperASR(): UseWhisperASRReturn {
         body: formData,
       });
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `请求失败 (${response.status})`);
+      const data = await response.json().catch(() => ({}));
+
+      // Handle structured error responses (returned as 200 with ok: false)
+      if (data.ok === false) {
+        throw new Error(data.error || '识别服务暂时不可用');
       }
 
-      const data = await response.json();
+      // Handle legacy non-200 responses
+      if (!response.ok) {
+        throw new Error(data.error || `请求失败 (${response.status})`);
+      }
+
       const text = data.text?.trim() || '';
 
       if (text) {

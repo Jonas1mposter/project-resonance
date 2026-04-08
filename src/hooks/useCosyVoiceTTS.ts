@@ -118,6 +118,17 @@ export function useCosyVoiceTTS(): UseCosyVoiceTTSReturn {
         throw new Error(errData.error || `TTS 请求失败 (${response.status})`);
       }
 
+      // Check for structured error in 200 response
+      const responseContentType = response.headers.get('content-type') || '';
+      if (responseContentType.includes('application/json')) {
+        const errData = await response.json();
+        if (errData.ok === false) {
+          throw new Error(errData.error || 'TTS 服务暂时不可用');
+        }
+        // Shouldn't reach here for valid audio, but just in case
+        throw new Error(errData.error || '未知错误');
+      }
+
       const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
