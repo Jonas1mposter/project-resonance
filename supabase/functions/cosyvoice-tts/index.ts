@@ -136,9 +136,9 @@ Deno.serve(async (req) => {
 
     console.log("[cosyvoice-tts] Success, audio bytes:", audioData.length);
 
-    // Determine content type based on audio format
-    const isAAC = audioUrl.endsWith(".aac") || audioUrl.includes(".aac");
-    const contentTypeOut = isAAC ? "audio/aac" : "audio/wav";
+    // HLS streams from Gradio are AAC; direct files could be WAV
+    const isHLS = audioUrl.includes("playlist.m3u8");
+    const contentTypeOut = isHLS ? "audio/aac" : "audio/wav";
 
     return new Response(audioData, {
       status: 200,
