@@ -190,7 +190,7 @@ async function uploadToGradio(api: string, file: File): Promise<Record<string, u
   };
 }
 
-/** Poll Gradio SSE endpoint for the audio URL */
+/** Poll Gradio SSE endpoint for the audio URL - prefers "complete" over "generating" */
 async function pollGradioResult(api: string, eventId: string): Promise<string | null> {
   const sseUrl = `${api}/gradio_api/call/generate_audio/${eventId}`;
   const res = await fetch(sseUrl, { headers: ngrokHeaders });
@@ -201,25 +201,35 @@ async function pollGradioResult(api: string, eventId: string): Promise<string | 
   }
 
   const text = await res.text();
-  // Parse SSE events
+  console.log("[cosyvoice-tts] SSE response:", text.substring(0, 1000));
+
+  // Parse SSE events - prefer "complete" URL over "generating" URL
   const lines = text.split("\n");
+  let generatingUrl: string | null = null;
+  let completeUrl: string | null = null;
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (line.startsWith("data: ") && i > 0) {
       const eventLine = lines[i - 1];
-      if (eventLine.includes("generating") || eventLine.includes("complete")) {
-        try {
-          const data = JSON.parse(line.substring(6));
-          if (Array.isArray(data) && data[0]?.url) {
-            return data[0].url;
+      try {
+        const data = JSON.parse(line.substring(6));
+        if (Array.isArray(data) && data[0]?.url) {
+          if (eventLine.includes("complete")) {
+            completeUrl = data[0].url;
+          } else if (eventLine.includes("generating")) {
+            generatingUrl = data[0].url;
           }
-        } catch { /* continue */ }
-      }
+        }
+      } catch { /* continue */ }
     }
   }
 
-  console.error("[cosyvoice-tts] No audio URL found in SSE response:", text.substring(0, 500));
-  return null;
+  const audioUrl = completeUrl || generatingUrl;
+  if (!audioUrl) {
+    console.error("[cosyvoice-tts] No audio URL found in SSE response:", text.substring(0, 500));
+  }
+  return audioUrl;
 }
 
 /** Fetch audio from URL - handles both direct files and HLS playlists */
@@ -235,43 +245,61 @@ async function fetchAudio(api: string, audioUrl: string): Promise<Uint8Array | n
   return new Uint8Array(await res.arrayBuffer());
 }
 
-/** Download HLS playlist and concatenate all audio segments */
+/** Download HLS playlist and concatenate all audio segments, with retry for incomplete playlists */
 async function fetchHLSAudio(playlistUrl: string): Promise<Uint8Array | null> {
-  const res = await fetch(playlistUrl, { headers: ngrokHeaders });
-  if (!res.ok) return null;
+  // Retry up to 5 times waiting for segments to appear
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const res = await fetch(playlistUrl, { headers: ngrokHeaders });
+    if (!res.ok) return null;
 
-  const m3u8 = await res.text();
-  const baseUrl = playlistUrl.substring(0, playlistUrl.lastIndexOf("/") + 1);
+    const m3u8 = await res.text();
+    console.log("[cosyvoice-tts] HLS playlist (attempt", attempt + 1, "):", m3u8.substring(0, 300));
+    const baseUrl = playlistUrl.substring(0, playlistUrl.lastIndexOf("/") + 1);
 
-  // Extract segment filenames
-  const segments: string[] = [];
-  for (const line of m3u8.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith("#")) {
-      segments.push(trimmed);
+    // Extract segment filenames
+    const segments: string[] = [];
+    for (const line of m3u8.split("\n")) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith("#")) {
+        segments.push(trimmed);
+      }
     }
-  }
 
-  if (segments.length === 0) return null;
-
-  // Download all segments
-  const chunks: Uint8Array[] = [];
-  for (const seg of segments) {
-    const segUrl = seg.startsWith("http") ? seg : `${baseUrl}${seg}`;
-    const segRes = await fetch(segUrl, { headers: ngrokHeaders });
-    if (segRes.ok) {
-      chunks.push(new Uint8Array(await segRes.arrayBuffer()));
+    if (segments.length === 0) {
+      // Playlist empty, audio not ready yet - wait and retry
+      console.log("[cosyvoice-tts] No segments yet, retrying in 2s...");
+      await new Promise(r => setTimeout(r, 2000));
+      continue;
     }
+
+    // Download all segments
+    const chunks: Uint8Array[] = [];
+    for (const seg of segments) {
+      const segUrl = seg.startsWith("http") ? seg : `${baseUrl}${seg}`;
+      const segRes = await fetch(segUrl, { headers: ngrokHeaders });
+      if (segRes.ok) {
+        chunks.push(new Uint8Array(await segRes.arrayBuffer()));
+      }
+    }
+
+    // Concatenate
+    const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
+    if (totalLen < 500) {
+      // Suspiciously small audio - segments might be empty, retry
+      console.log("[cosyvoice-tts] Audio too small (", totalLen, "bytes), retrying...");
+      await new Promise(r => setTimeout(r, 2000));
+      continue;
+    }
+
+    const result = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return result;
   }
 
-  // Concatenate
-  const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
-  const result = new Uint8Array(totalLen);
-  let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  return result;
+  console.error("[cosyvoice-tts] HLS fetch exhausted retries");
+  return null;
 }
