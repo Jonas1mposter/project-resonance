@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     let ttsText: string;
     let promptText = "";
     let promptFileRef: Record<string, unknown> | null = null;
-    let mode = "预训练音色"; // default to SFT mode when no prompt audio
+    let mode = "3s极速复刻";
 
     if (contentType.includes("multipart/form-data")) {
       // Zero-shot with prompt audio
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
         console.log("[cosyvoice-tts] Uploaded prompt audio, ref:", JSON.stringify(promptFileRef));
       }
     } else {
-      // JSON body
+      // JSON body — no prompt audio
       const body = await req.json();
       ttsText = body.text;
       if (!ttsText) {
@@ -80,6 +80,11 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      // No SFT speakers available, prompt audio is required
+      return new Response(
+        JSON.stringify({ error: "请先「存为音色」后再朗读，当前服务需要参考音频" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     console.log("[cosyvoice-tts] Mode:", mode, "text length:", ttsText.length);
