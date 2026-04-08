@@ -92,11 +92,10 @@ Deno.serve(async (req) => {
     // Step 1: Submit job to Gradio
     // Parameters: tts_text, mode_checkbox_group, sft_dropdown, prompt_text,
     //             prompt_wav_upload, prompt_wav_record, instruct_text, seed, stream, speed
-    const sftSpeaker = mode === "预训练音色" ? "中文女" : "";
     const gradioData = [
       ttsText,          // tts_text
       mode,             // mode_checkbox_group
-      sftSpeaker,       // sft_dropdown
+      "",               // sft_dropdown (no SFT speakers available)
       promptText,       // prompt_text
       promptFileRef,    // prompt_wav_upload (null or file ref)
       null,             // prompt_wav_record
