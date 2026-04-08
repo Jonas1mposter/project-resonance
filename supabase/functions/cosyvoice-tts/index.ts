@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
 
     const submitRes = await fetch(`${api}/gradio_api/call/generate_audio`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...ngrokHeaders },
       body: JSON.stringify({ data: gradioData }),
     });
 
@@ -167,6 +167,8 @@ async function uploadToGradio(api: string, file: File): Promise<Record<string, u
 
   const res = await fetch(`${api}/gradio_api/upload`, {
     method: "POST",
+    headers: { ...ngrokHeaders },
+    body: uploadForm,
     body: uploadForm,
   });
 
@@ -186,7 +188,7 @@ async function uploadToGradio(api: string, file: File): Promise<Record<string, u
 /** Poll Gradio SSE endpoint for the audio URL */
 async function pollGradioResult(api: string, eventId: string): Promise<string | null> {
   const sseUrl = `${api}/gradio_api/call/generate_audio/${eventId}`;
-  const res = await fetch(sseUrl);
+  const res = await fetch(sseUrl, { headers: ngrokHeaders });
 
   if (!res.ok || !res.body) {
     console.error("[cosyvoice-tts] SSE fetch failed:", res.status);
@@ -223,14 +225,14 @@ async function fetchAudio(api: string, audioUrl: string): Promise<Uint8Array | n
   }
 
   // Direct file download
-  const res = await fetch(audioUrl);
+  const res = await fetch(audioUrl, { headers: ngrokHeaders });
   if (!res.ok) return null;
   return new Uint8Array(await res.arrayBuffer());
 }
 
 /** Download HLS playlist and concatenate all audio segments */
 async function fetchHLSAudio(playlistUrl: string): Promise<Uint8Array | null> {
-  const res = await fetch(playlistUrl);
+  const res = await fetch(playlistUrl, { headers: ngrokHeaders });
   if (!res.ok) return null;
 
   const m3u8 = await res.text();
