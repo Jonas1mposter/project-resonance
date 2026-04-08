@@ -190,7 +190,7 @@ async function uploadToGradio(api: string, file: File): Promise<Record<string, u
   };
 }
 
-/** Poll Gradio SSE endpoint for the audio URL */
+/** Poll Gradio SSE endpoint for the audio URL - prefers "complete" over "generating" */
 async function pollGradioResult(api: string, eventId: string): Promise<string | null> {
   const sseUrl = `${api}/gradio_api/call/generate_audio/${eventId}`;
   const res = await fetch(sseUrl, { headers: ngrokHeaders });
@@ -201,25 +201,35 @@ async function pollGradioResult(api: string, eventId: string): Promise<string | 
   }
 
   const text = await res.text();
-  // Parse SSE events
+  console.log("[cosyvoice-tts] SSE response:", text.substring(0, 1000));
+
+  // Parse SSE events - prefer "complete" URL over "generating" URL
   const lines = text.split("\n");
+  let generatingUrl: string | null = null;
+  let completeUrl: string | null = null;
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (line.startsWith("data: ") && i > 0) {
       const eventLine = lines[i - 1];
-      if (eventLine.includes("generating") || eventLine.includes("complete")) {
-        try {
-          const data = JSON.parse(line.substring(6));
-          if (Array.isArray(data) && data[0]?.url) {
-            return data[0].url;
+      try {
+        const data = JSON.parse(line.substring(6));
+        if (Array.isArray(data) && data[0]?.url) {
+          if (eventLine.includes("complete")) {
+            completeUrl = data[0].url;
+          } else if (eventLine.includes("generating")) {
+            generatingUrl = data[0].url;
           }
-        } catch { /* continue */ }
-      }
+        }
+      } catch { /* continue */ }
     }
   }
 
-  console.error("[cosyvoice-tts] No audio URL found in SSE response:", text.substring(0, 500));
-  return null;
+  const audioUrl = completeUrl || generatingUrl;
+  if (!audioUrl) {
+    console.error("[cosyvoice-tts] No audio URL found in SSE response:", text.substring(0, 500));
+  }
+  return audioUrl;
 }
 
 /** Fetch audio from URL - handles both direct files and HLS playlists */
