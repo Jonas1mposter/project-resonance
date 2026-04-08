@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     let ttsText: string;
     let promptText = "";
     let promptFileRef: Record<string, unknown> | null = null;
-    let mode = "3s极速复刻"; // default to zero-shot mode
+    let mode = "3s极速复刻";
 
     if (contentType.includes("multipart/form-data")) {
       // Zero-shot with prompt audio
@@ -67,10 +67,11 @@ Deno.serve(async (req) => {
       if (promptWav) {
         // Upload the prompt audio to Gradio
         promptFileRef = await uploadToGradio(api, promptWav);
+        mode = "3s极速复刻"; // switch to zero-shot mode when prompt audio is provided
         console.log("[cosyvoice-tts] Uploaded prompt audio, ref:", JSON.stringify(promptFileRef));
       }
     } else {
-      // JSON body
+      // JSON body — no prompt audio
       const body = await req.json();
       ttsText = body.text;
       if (!ttsText) {
@@ -79,6 +80,11 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      // No SFT speakers available, prompt audio is required
+      return new Response(
+        JSON.stringify({ error: "请先「存为音色」后再朗读，当前服务需要参考音频" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     console.log("[cosyvoice-tts] Mode:", mode, "text length:", ttsText.length);
@@ -89,7 +95,7 @@ Deno.serve(async (req) => {
     const gradioData = [
       ttsText,          // tts_text
       mode,             // mode_checkbox_group
-      "",               // sft_dropdown
+      "",               // sft_dropdown (no SFT speakers available)
       promptText,       // prompt_text
       promptFileRef,    // prompt_wav_upload (null or file ref)
       null,             // prompt_wav_record
@@ -168,7 +174,6 @@ async function uploadToGradio(api: string, file: File): Promise<Record<string, u
   const res = await fetch(`${api}/gradio_api/upload`, {
     method: "POST",
     headers: { ...ngrokHeaders },
-    body: uploadForm,
     body: uploadForm,
   });
 
