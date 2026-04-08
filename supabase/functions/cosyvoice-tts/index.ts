@@ -8,8 +8,8 @@
  *   3. Fetch HLS playlist → download audio segments → return concatenated audio
  *
  * Supports:
- *   - Default mode (no prompt audio): uses "3s极速复刻" with empty prompt
  *   - Zero-shot cloning: uploads prompt_wav first, then references it
+ *   - Returns structured JSON errors (never raw 500) so frontend can handle gracefully
  */
 
 const corsHeaders = {
@@ -21,6 +21,16 @@ const corsHeaders = {
 /** Headers to bypass ngrok's browser interception page */
 const ngrokHeaders = { "ngrok-skip-browser-warning": "true" };
 
+const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
+/** Return a structured error as HTTP 200 so the client can read it */
+function errorResponse(error: string, fallback = false) {
+  return new Response(
+    JSON.stringify({ ok: false, error, fallback }),
+    { status: 200, headers: jsonHeaders }
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -28,17 +38,13 @@ Deno.serve(async (req) => {
 
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 405, headers: jsonHeaders,
     });
   }
 
   const baseUrl = Deno.env.get("COSYVOICE_API_URL");
   if (!baseUrl) {
-    return new Response(
-      JSON.stringify({ error: "COSYVOICE_API_URL not configured" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return errorResponse("语音合成服务未配置，请联系管理员", true);
   }
 
   const api = baseUrl.replace(/\/$/, "");
@@ -48,7 +54,7 @@ Deno.serve(async (req) => {
     let ttsText: string;
     let promptText = "";
     let promptFileRef: Record<string, unknown> | null = null;
-    let mode = "3s极速复刻";
+    const mode = "3s极速复刻";
 
     if (contentType.includes("multipart/form-data")) {
       // Zero-shot with prompt audio
@@ -58,16 +64,11 @@ Deno.serve(async (req) => {
       const promptWav = formData.get("prompt_wav") as File | null;
 
       if (!ttsText) {
-        return new Response(JSON.stringify({ error: "Missing 'tts_text'" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return errorResponse("Missing 'tts_text'");
       }
 
       if (promptWav) {
-        // Upload the prompt audio to Gradio
         promptFileRef = await uploadToGradio(api, promptWav);
-        mode = "3s极速复刻"; // switch to zero-shot mode when prompt audio is provided
         console.log("[cosyvoice-tts] Uploaded prompt audio, ref:", JSON.stringify(promptFileRef));
       }
     } else {
@@ -75,29 +76,21 @@ Deno.serve(async (req) => {
       const body = await req.json();
       ttsText = body.text;
       if (!ttsText) {
-        return new Response(JSON.stringify({ error: "Missing 'text'" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return errorResponse("Missing 'text'");
       }
       // No SFT speakers available, prompt audio is required
-      return new Response(
-        JSON.stringify({ error: "请先「存为音色」后再朗读，当前服务需要参考音频" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse("请先「存为音色」后再朗读，当前服务需要参考音频", true);
     }
 
     console.log("[cosyvoice-tts] Mode:", mode, "text length:", ttsText.length);
 
     // Step 1: Submit job to Gradio
-    // Parameters: tts_text, mode_checkbox_group, sft_dropdown, prompt_text,
-    //             prompt_wav_upload, prompt_wav_record, instruct_text, seed, stream, speed
     const gradioData = [
       ttsText,          // tts_text
       mode,             // mode_checkbox_group
-      "",               // sft_dropdown (no SFT speakers available)
+      "",               // sft_dropdown
       promptText,       // prompt_text
-      promptFileRef,    // prompt_wav_upload (null or file ref)
+      promptFileRef,    // prompt_wav_upload
       null,             // prompt_wav_record
       "",               // instruct_text
       0,                // seed
@@ -114,9 +107,10 @@ Deno.serve(async (req) => {
     if (!submitRes.ok) {
       const errText = await submitRes.text();
       console.error("[cosyvoice-tts] Submit error:", submitRes.status, errText);
-      return new Response(
-        JSON.stringify({ error: "Failed to submit TTS job", detail: errText }),
-        { status: submitRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      const isOffline = errText.includes("ngrok") || errText.includes("ERR_NGROK");
+      return errorResponse(
+        isOffline ? "语音合成服务离线，请稍后重试" : "语音合成任务提交失败",
+        true
       );
     }
 
@@ -126,26 +120,19 @@ Deno.serve(async (req) => {
     // Step 2: Poll SSE for result
     const audioUrl = await pollGradioResult(api, event_id);
     if (!audioUrl) {
-      return new Response(
-        JSON.stringify({ error: "TTS generation failed - no audio URL returned" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse("语音合成失败，模型未返回音频", true);
     }
 
     console.log("[cosyvoice-tts] Audio URL:", audioUrl);
 
-    // Step 3: Fetch audio - could be HLS playlist or direct file
+    // Step 3: Fetch audio
     const audioData = await fetchAudio(api, audioUrl);
     if (!audioData || audioData.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "Failed to download audio" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return errorResponse("语音合成完成但音频下载失败，请重试", true);
     }
 
     console.log("[cosyvoice-tts] Success, audio bytes:", audioData.length);
 
-    // HLS streams from Gradio are AAC; direct files could be WAV
     const isHLS = audioUrl.includes("playlist.m3u8");
     const contentTypeOut = isHLS ? "audio/aac" : "audio/wav";
 
@@ -159,9 +146,11 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("[cosyvoice-tts] Error:", err);
-    return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    const isOffline = msg.includes("ngrok") || msg.includes("ERR_NGROK");
+    return errorResponse(
+      isOffline ? "语音合成服务离线，请稍后重试" : `语音合成出错: ${msg}`,
+      true
     );
   }
 });
@@ -183,7 +172,6 @@ async function uploadToGradio(api: string, file: File): Promise<Record<string, u
   }
 
   const paths: string[] = await res.json();
-  // Return Gradio FileData format
   return {
     path: paths[0],
     meta: { _type: "gradio.FileData" },
@@ -203,7 +191,6 @@ async function pollGradioResult(api: string, eventId: string): Promise<string | 
   const text = await res.text();
   console.log("[cosyvoice-tts] SSE response:", text.substring(0, 1000));
 
-  // Parse SSE events - prefer "complete" URL over "generating" URL
   const lines = text.split("\n");
   let generatingUrl: string | null = null;
   let completeUrl: string | null = null;
@@ -233,21 +220,18 @@ async function pollGradioResult(api: string, eventId: string): Promise<string | 
 }
 
 /** Fetch audio from URL - handles both direct files and HLS playlists */
-async function fetchAudio(api: string, audioUrl: string): Promise<Uint8Array | null> {
-  // If it's an HLS playlist, download segments
+async function fetchAudio(_api: string, audioUrl: string): Promise<Uint8Array | null> {
   if (audioUrl.includes("playlist.m3u8")) {
     return await fetchHLSAudio(audioUrl);
   }
 
-  // Direct file download
   const res = await fetch(audioUrl, { headers: ngrokHeaders });
   if (!res.ok) return null;
   return new Uint8Array(await res.arrayBuffer());
 }
 
-/** Download HLS playlist and concatenate all audio segments, with retry for incomplete playlists */
+/** Download HLS playlist and concatenate all audio segments, with retry */
 async function fetchHLSAudio(playlistUrl: string): Promise<Uint8Array | null> {
-  // Retry up to 5 times waiting for segments to appear
   for (let attempt = 0; attempt < 5; attempt++) {
     const res = await fetch(playlistUrl, { headers: ngrokHeaders });
     if (!res.ok) return null;
@@ -256,7 +240,6 @@ async function fetchHLSAudio(playlistUrl: string): Promise<Uint8Array | null> {
     console.log("[cosyvoice-tts] HLS playlist (attempt", attempt + 1, "):", m3u8.substring(0, 300));
     const baseUrl = playlistUrl.substring(0, playlistUrl.lastIndexOf("/") + 1);
 
-    // Extract segment filenames
     const segments: string[] = [];
     for (const line of m3u8.split("\n")) {
       const trimmed = line.trim();
@@ -266,13 +249,11 @@ async function fetchHLSAudio(playlistUrl: string): Promise<Uint8Array | null> {
     }
 
     if (segments.length === 0) {
-      // Playlist empty, audio not ready yet - wait and retry
       console.log("[cosyvoice-tts] No segments yet, retrying in 2s...");
       await new Promise(r => setTimeout(r, 2000));
       continue;
     }
 
-    // Download all segments
     const chunks: Uint8Array[] = [];
     for (const seg of segments) {
       const segUrl = seg.startsWith("http") ? seg : `${baseUrl}${seg}`;
@@ -282,10 +263,8 @@ async function fetchHLSAudio(playlistUrl: string): Promise<Uint8Array | null> {
       }
     }
 
-    // Concatenate
     const totalLen = chunks.reduce((sum, c) => sum + c.length, 0);
     if (totalLen < 500) {
-      // Suspiciously small audio - segments might be empty, retry
       console.log("[cosyvoice-tts] Audio too small (", totalLen, "bytes), retrying...");
       await new Promise(r => setTimeout(r, 2000));
       continue;
