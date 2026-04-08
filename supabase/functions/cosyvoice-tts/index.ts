@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     let ttsText: string;
     let promptText = "";
     let promptFileRef: Record<string, unknown> | null = null;
-    let mode = "3s极速复刻"; // default to zero-shot mode
+    let mode = "预训练音色"; // default to SFT mode when no prompt audio
 
     if (contentType.includes("multipart/form-data")) {
       // Zero-shot with prompt audio
@@ -67,6 +67,7 @@ Deno.serve(async (req) => {
       if (promptWav) {
         // Upload the prompt audio to Gradio
         promptFileRef = await uploadToGradio(api, promptWav);
+        mode = "3s极速复刻"; // switch to zero-shot mode when prompt audio is provided
         console.log("[cosyvoice-tts] Uploaded prompt audio, ref:", JSON.stringify(promptFileRef));
       }
     } else {
@@ -86,10 +87,11 @@ Deno.serve(async (req) => {
     // Step 1: Submit job to Gradio
     // Parameters: tts_text, mode_checkbox_group, sft_dropdown, prompt_text,
     //             prompt_wav_upload, prompt_wav_record, instruct_text, seed, stream, speed
+    const sftSpeaker = mode === "预训练音色" ? "中文女" : "";
     const gradioData = [
       ttsText,          // tts_text
       mode,             // mode_checkbox_group
-      "",               // sft_dropdown
+      sftSpeaker,       // sft_dropdown
       promptText,       // prompt_text
       promptFileRef,    // prompt_wav_upload (null or file ref)
       null,             // prompt_wav_record
@@ -168,7 +170,6 @@ async function uploadToGradio(api: string, file: File): Promise<Record<string, u
   const res = await fetch(`${api}/gradio_api/upload`, {
     method: "POST",
     headers: { ...ngrokHeaders },
-    body: uploadForm,
     body: uploadForm,
   });
 
