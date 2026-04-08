@@ -14,6 +14,8 @@ const corsHeaders = {
 /** Headers to bypass ngrok's browser interception page */
 const ngrokHeaders = { "ngrok-skip-browser-warning": "true" };
 
+const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -22,23 +24,43 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: jsonHeaders,
     });
   }
 
   const whisperUrl = Deno.env.get("WHISPER_API_URL");
   if (!whisperUrl) {
     return new Response(
-      JSON.stringify({ error: "ASR 服务尚未部署（WHISPER_API_URL 未配置）" }),
-      {
-        status: 503,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ ok: false, error: "ASR 服务尚未部署（WHISPER_API_URL 未配置）", fallback: true }),
+      { status: 200, headers: jsonHeaders }
     );
   }
 
   try {
     const contentType = req.headers.get("content-type") || "";
+
+    // Handle ping/health checks
+    if (contentType.includes("application/json")) {
+      try {
+        const body = await req.json();
+        if (body.ping) {
+          // Health check — try reaching the upstream
+          try {
+            const healthRes = await fetch(whisperUrl.replace(/\/+$/, "") + "/health", {
+              headers: ngrokHeaders,
+            });
+            if (healthRes.ok) {
+              return new Response(JSON.stringify({ ok: true, status: "connected" }), {
+                status: 200, headers: jsonHeaders,
+              });
+            }
+          } catch { /* fall through */ }
+          return new Response(JSON.stringify({ ok: false, status: "unreachable" }), {
+            status: 503, headers: jsonHeaders,
+          });
+        }
+      } catch { /* not JSON, continue */ }
+    }
 
     let formData: FormData;
 
@@ -78,20 +100,29 @@ Deno.serve(async (req) => {
       const result = await response.text();
       console.error("[whisper-asr] API error:", response.status, result);
       return new Response(
-        JSON.stringify({ error: "Whisper API error", status: response.status, detail: result }),
-        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          ok: false,
+          error: "语音识别服务暂时不可用，请稍后重试",
+          detail: result,
+          fallback: response.status >= 500,
+        }),
+        { status: 200, headers: jsonHeaders }
       );
     }
 
     return new Response(response.body, {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: jsonHeaders,
     });
   } catch (err) {
     console.error("[whisper-asr] Error:", err);
     return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({
+        ok: false,
+        error: "语音识别服务连接失败，请检查网络",
+        fallback: true,
+      }),
+      { status: 200, headers: jsonHeaders }
     );
   }
 });
