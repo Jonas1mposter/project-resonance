@@ -245,24 +245,32 @@ async function fetchAudio(api: string, audioUrl: string): Promise<Uint8Array | n
   return new Uint8Array(await res.arrayBuffer());
 }
 
-/** Download HLS playlist and concatenate all audio segments */
+/** Download HLS playlist and concatenate all audio segments, with retry for incomplete playlists */
 async function fetchHLSAudio(playlistUrl: string): Promise<Uint8Array | null> {
-  const res = await fetch(playlistUrl, { headers: ngrokHeaders });
-  if (!res.ok) return null;
+  // Retry up to 5 times waiting for segments to appear
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const res = await fetch(playlistUrl, { headers: ngrokHeaders });
+    if (!res.ok) return null;
 
-  const m3u8 = await res.text();
-  const baseUrl = playlistUrl.substring(0, playlistUrl.lastIndexOf("/") + 1);
+    const m3u8 = await res.text();
+    console.log("[cosyvoice-tts] HLS playlist (attempt", attempt + 1, "):", m3u8.substring(0, 300));
+    const baseUrl = playlistUrl.substring(0, playlistUrl.lastIndexOf("/") + 1);
 
-  // Extract segment filenames
-  const segments: string[] = [];
-  for (const line of m3u8.split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith("#")) {
-      segments.push(trimmed);
+    // Extract segment filenames
+    const segments: string[] = [];
+    for (const line of m3u8.split("\n")) {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith("#")) {
+        segments.push(trimmed);
+      }
     }
-  }
 
-  if (segments.length === 0) return null;
+    if (segments.length === 0) {
+      // Playlist empty, audio not ready yet - wait and retry
+      console.log("[cosyvoice-tts] No segments yet, retrying in 2s...");
+      await new Promise(r => setTimeout(r, 2000));
+      continue;
+    }
 
   // Download all segments
   const chunks: Uint8Array[] = [];
