@@ -253,7 +253,7 @@ async function fetchHLSAudio(playlistUrl: string): Promise<Uint8Array | null> {
   const chunks: Uint8Array[] = [];
   for (const seg of segments) {
     const segUrl = seg.startsWith("http") ? seg : `${baseUrl}${seg}`;
-    const segRes = await fetch(segUrl);
+    const segRes = await fetch(segUrl, { headers: ngrokHeaders });
     if (segRes.ok) {
       chunks.push(new Uint8Array(await segRes.arrayBuffer()));
     }
