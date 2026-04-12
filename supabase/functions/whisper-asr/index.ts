@@ -11,9 +11,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-/** Headers to bypass ngrok's browser interception page */
-const ngrokHeaders = { "ngrok-skip-browser-warning": "true" };
-
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
 Deno.serve(async (req) => {
@@ -44,11 +41,8 @@ Deno.serve(async (req) => {
       try {
         const body = await req.json();
         if (body.ping) {
-          // Health check — try reaching the upstream
           try {
-            const healthRes = await fetch(whisperUrl.replace(/\/+$/, "") + "/health", {
-              headers: ngrokHeaders,
-            });
+            const healthRes = await fetch(whisperUrl.replace(/\/+$/, "") + "/health");
             if (healthRes.ok) {
               return new Response(JSON.stringify({ ok: true, status: "connected" }), {
                 status: 200, headers: jsonHeaders,
@@ -92,7 +86,6 @@ Deno.serve(async (req) => {
 
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { ...ngrokHeaders },
       body: formData,
     });
 
