@@ -18,7 +18,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
 /** Return a structured error as HTTP 200 so the client can read it */
@@ -55,7 +54,6 @@ Deno.serve(async (req) => {
     const mode = "3s极速复刻";
 
     if (contentType.includes("multipart/form-data")) {
-      // Zero-shot with prompt audio
       const formData = await req.formData();
       ttsText = formData.get("tts_text") as string;
       promptText = (formData.get("prompt_text") as string) || "";
@@ -70,13 +68,11 @@ Deno.serve(async (req) => {
         console.log("[cosyvoice-tts] Uploaded prompt audio, ref:", JSON.stringify(promptFileRef));
       }
     } else {
-      // JSON body — no prompt audio
       const body = await req.json();
       ttsText = body.text;
       if (!ttsText) {
         return errorResponse("Missing 'text'");
       }
-      // No SFT speakers available, prompt audio is required
       return errorResponse("请先「存为音色」后再朗读，当前服务需要参考音频", true);
     }
 
@@ -84,32 +80,19 @@ Deno.serve(async (req) => {
 
     // Step 1: Submit job to Gradio
     const gradioData = [
-      ttsText,          // tts_text
-      mode,             // mode_checkbox_group
-      "",               // sft_dropdown
-      promptText,       // prompt_text
-      promptFileRef,    // prompt_wav_upload
-      null,             // prompt_wav_record
-      "",               // instruct_text
-      0,                // seed
-      false,            // stream
-      1.0,              // speed
+      ttsText, mode, "", promptText, promptFileRef, null, "", 0, false, 1.0,
     ];
 
     const submitRes = await fetch(`${api}/gradio_api/call/generate_audio`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...ngrokHeaders },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ data: gradioData }),
     });
 
     if (!submitRes.ok) {
       const errText = await submitRes.text();
       console.error("[cosyvoice-tts] Submit error:", submitRes.status, errText);
-      const isOffline = errText.includes("ngrok") || errText.includes("ERR_NGROK");
-      return errorResponse(
-        isOffline ? "语音合成服务离线，请稍后重试" : "语音合成任务提交失败",
-        true
-      );
+      return errorResponse("语音合成任务提交失败", true);
     }
 
     const { event_id } = await submitRes.json();
@@ -145,11 +128,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("[cosyvoice-tts] Error:", err);
     const msg = err instanceof Error ? err.message : "Unknown error";
-    const isOffline = msg.includes("ngrok") || msg.includes("ERR_NGROK");
-    return errorResponse(
-      isOffline ? "语音合成服务离线，请稍后重试" : `语音合成出错: ${msg}`,
-      true
-    );
+    return errorResponse(`语音合成出错: ${msg}`, true);
   }
 });
 
@@ -160,7 +139,6 @@ async function uploadToGradio(api: string, file: File): Promise<Record<string, u
 
   const res = await fetch(`${api}/gradio_api/upload`, {
     method: "POST",
-    headers: { ...ngrokHeaders },
     body: uploadForm,
   });
 
@@ -176,10 +154,10 @@ async function uploadToGradio(api: string, file: File): Promise<Record<string, u
   };
 }
 
-/** Poll Gradio SSE endpoint for the audio URL - prefers "complete" over "generating" */
+/** Poll Gradio SSE endpoint for the audio URL */
 async function pollGradioResult(api: string, eventId: string): Promise<string | null> {
   const sseUrl = `${api}/gradio_api/call/generate_audio/${eventId}`;
-  const res = await fetch(sseUrl, { headers: ngrokHeaders });
+  const res = await fetch(sseUrl);
 
   if (!res.ok || !res.body) {
     console.error("[cosyvoice-tts] SSE fetch failed:", res.status);
@@ -223,7 +201,7 @@ async function fetchAudio(_api: string, audioUrl: string): Promise<Uint8Array | 
     return await fetchHLSAudio(audioUrl);
   }
 
-  const res = await fetch(audioUrl, { headers: ngrokHeaders });
+  const res = await fetch(audioUrl);
   if (!res.ok) return null;
   return new Uint8Array(await res.arrayBuffer());
 }
@@ -231,7 +209,7 @@ async function fetchAudio(_api: string, audioUrl: string): Promise<Uint8Array | 
 /** Download HLS playlist and concatenate all audio segments, with retry */
 async function fetchHLSAudio(playlistUrl: string): Promise<Uint8Array | null> {
   for (let attempt = 0; attempt < 5; attempt++) {
-    const res = await fetch(playlistUrl, { headers: ngrokHeaders });
+    const res = await fetch(playlistUrl);
     if (!res.ok) return null;
 
     const m3u8 = await res.text();
@@ -255,7 +233,7 @@ async function fetchHLSAudio(playlistUrl: string): Promise<Uint8Array | null> {
     const chunks: Uint8Array[] = [];
     for (const seg of segments) {
       const segUrl = seg.startsWith("http") ? seg : `${baseUrl}${seg}`;
-      const segRes = await fetch(segUrl, { headers: ngrokHeaders });
+      const segRes = await fetch(segUrl);
       if (segRes.ok) {
         chunks.push(new Uint8Array(await segRes.arrayBuffer()));
       }
