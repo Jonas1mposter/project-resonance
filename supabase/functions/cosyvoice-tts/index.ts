@@ -18,8 +18,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-/** Headers to bypass ngrok's browser interception page */
-const ngrokHeaders = { "ngrok-skip-browser-warning": "true" };
 
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
