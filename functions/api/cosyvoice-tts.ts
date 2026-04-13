@@ -22,7 +22,7 @@ function errorResponse(error: string, fallback = false) {
   );
 }
 
-const INTERNAL_HOST = "http://cosyvoice-service";
+const INTERNAL_HOST = "http://127.0.0.1";
 
 /** Upload a file to Gradio via VPC and return the file reference object */
 async function uploadToGradio(vpc: Fetcher, file: File): Promise<Record<string, unknown>> {

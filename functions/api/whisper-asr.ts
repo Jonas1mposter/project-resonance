@@ -48,7 +48,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         const body = await request.json() as any;
         if (body.ping) {
           try {
-            const healthRes = await env.WHISPER_VPC.fetch("http://whisper-service/health");
+            const healthRes = await env.WHISPER_VPC.fetch("http://127.0.0.1/health");
             if (healthRes.ok) {
               return new Response(JSON.stringify({ ok: true, status: "connected" }), {
                 status: 200, headers: jsonHeaders,
@@ -88,7 +88,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     // Forward to Whisper API via VPC binding
-    const response = await env.WHISPER_VPC.fetch("http://whisper-service/v1/audio/transcriptions", {
+    const response = await env.WHISPER_VPC.fetch("http://127.0.0.1/v1/audio/transcriptions", {
       method: "POST",
       body: formData,
     });
