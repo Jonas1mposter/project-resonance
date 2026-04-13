@@ -21,8 +21,7 @@ export default function ASRSettingsPanel({ settings, onUpdate }: ASRSettingsPane
           method: 'GET',
         });
 
-        if (cancelled) return;
-        setStatus(res.status === 503 ? 'offline' : 'online');
+        setStatus(res.ok ? 'online' : 'offline');
       } catch {
         if (!cancelled) setStatus('offline');
       }
