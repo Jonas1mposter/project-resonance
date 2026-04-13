@@ -12,6 +12,18 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      '/api/whisper-asr': {
+        target: 'https://whisper-project-resonance.project-resonance.cn',
+        changeOrigin: true,
+        rewrite: (path) => '/v1/audio/transcriptions',
+      },
+      '/api/cosyvoice-tts': {
+        target: 'https://cosyvoice-project-resonance.project-resonance.cn',
+        changeOrigin: true,
+        rewrite: (path) => '/gradio_api/call/generate_audio',
+      },
+    },
   },
   plugins: [
     react(),
