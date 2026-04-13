@@ -66,19 +66,11 @@ export function useWhisperASR(): UseWhisperASRReturn {
     let whisperFailed = false;
 
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl) {
-        throw new Error('未配置后端地址');
-      }
-
       const formData = new FormData();
       formData.append('file', audioBlob, 'recording.webm');
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/whisper-asr`, {
+      const response = await fetch('/api/whisper-asr', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
         body: formData,
       });
 

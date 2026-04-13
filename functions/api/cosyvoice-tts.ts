@@ -153,7 +153,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     });
   }
 
-  const baseUrl = env.COSYVOICE_API_URL;
+  const baseUrl = env.COSYVOICE_API_URL || "https://cosyvoice-project-resonance.project-resonance.cn";
   if (!baseUrl) {
     return errorResponse("语音合成服务未配置，请联系管理员", true);
   }
