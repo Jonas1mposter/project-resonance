@@ -17,7 +17,8 @@ export default function ASRSettingsPanel({ settings, onUpdate }: ASRSettingsPane
     const check = async () => {
       setStatus('checking');
       try {
-        const res = await fetch('/api/whisper-asr', {
+        const apiBase = import.meta.env.VITE_WORKER_API_URL || '';
+        const res = await fetch(`${apiBase}/api/whisper-asr`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ping: true }),
