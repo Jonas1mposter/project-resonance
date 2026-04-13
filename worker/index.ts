@@ -9,6 +9,7 @@ import { handleCosyVoiceTTS } from './cosyvoice-tts';
 export interface Env {
   WHISPER_VPC: Fetcher;
   COSYVOICE_VPC: Fetcher;
+  ASSETS: Fetcher;
 }
 
 const corsHeaders: Record<string, string> = {
@@ -33,10 +34,8 @@ export default {
       if (path === '/api/cosyvoice-tts') {
         return await handleCosyVoiceTTS(request, env);
       }
-      return new Response(JSON.stringify({ error: 'Not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      // All other routes: serve static assets (SPA)
+      return env.ASSETS.fetch(request);
     } catch (err) {
       console.error('[worker] Unhandled error:', err);
       return new Response(JSON.stringify({ ok: false, error: 'Internal error' }), {
