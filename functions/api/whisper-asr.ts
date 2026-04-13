@@ -1,12 +1,10 @@
 /**
  * Cloudflare Pages Function: Whisper ASR Proxy
- *
- * Forwards audio to a self-hosted Whisper-compatible API.
- * Set WHISPER_API_URL in Cloudflare Pages environment variables.
+ * Uses VPC Service binding to reach private Whisper server via Cloudflare Tunnel.
  */
 
 interface Env {
-  WHISPER_API_URL?: string;
+  WHISPER_VPC: Fetcher;
 }
 
 const corsHeaders = {
@@ -37,12 +35,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     });
   }
 
-  const whisperUrl = env.WHISPER_API_URL || "https://whisper-project-resonance.project-resonance.cn";
-  if (!whisperUrl) {
-    return new Response(
-      JSON.stringify({ ok: false, error: "ASR 服务尚未部署（WHISPER_API_URL 未配置）", fallback: true }),
-      { status: 200, headers: jsonHeaders }
-    );
+  if (!env.WHISPER_VPC) {
+    return errorResponse("ASR 服务未配置 VPC 绑定", true);
   }
 
   try {
@@ -54,7 +48,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         const body = await request.json() as any;
         if (body.ping) {
           try {
-            const healthRes = await fetch(whisperUrl.replace(/\/+$/, "") + "/health");
+            const healthRes = await env.WHISPER_VPC.fetch("http://whisper-service/health");
             if (healthRes.ok) {
               return new Response(JSON.stringify({ ok: true, status: "connected" }), {
                 status: 200, headers: jsonHeaders,
@@ -93,10 +87,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       formData.append("file", blob, "recording.webm");
     }
 
-    // Forward to Whisper API (OpenAI-compatible endpoint)
-    const endpoint = whisperUrl.replace(/\/+$/, "") + "/v1/audio/transcriptions";
-
-    const response = await fetch(endpoint, {
+    // Forward to Whisper API via VPC binding
+    const response = await env.WHISPER_VPC.fetch("http://whisper-service/v1/audio/transcriptions", {
       method: "POST",
       body: formData,
     });
