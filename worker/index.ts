@@ -1,0 +1,48 @@
+/**
+ * Cloudflare Worker: Resonance API Gateway
+ * Routes /api/whisper-asr and /api/cosyvoice-tts to private GPU services via VPC bindings.
+ */
+
+import { handleWhisperASR } from './whisper-asr';
+import { handleCosyVoiceTTS } from './cosyvoice-tts';
+
+export interface Env {
+  WHISPER_VPC: Fetcher;
+  COSYVOICE_VPC: Fetcher;
+}
+
+const corsHeaders: Record<string, string> = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders });
+    }
+
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    try {
+      if (path === '/api/whisper-asr') {
+        return await handleWhisperASR(request, env);
+      }
+      if (path === '/api/cosyvoice-tts') {
+        return await handleCosyVoiceTTS(request, env);
+      }
+      return new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } catch (err) {
+      console.error('[worker] Unhandled error:', err);
+      return new Response(JSON.stringify({ ok: false, error: 'Internal error' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  },
+};
