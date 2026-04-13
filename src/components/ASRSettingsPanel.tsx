@@ -23,7 +23,8 @@ export default function ASRSettingsPanel({ settings, onUpdate }: ASRSettingsPane
           body: JSON.stringify({ ping: true }),
         });
 
-        setStatus(res.ok ? 'online' : 'offline');
+        if (cancelled) return;
+        setStatus(res.status === 503 ? 'offline' : 'online');
       } catch {
         if (!cancelled) setStatus('offline');
       }
