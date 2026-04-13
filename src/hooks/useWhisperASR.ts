@@ -69,7 +69,7 @@ export function useWhisperASR(): UseWhisperASRReturn {
       const formData = new FormData();
       formData.append('file', audioBlob, 'recording.webm');
 
-      const response = await fetch('https://whisper-project-resonance.project-resonance.cn/v1/audio/transcriptions', {
+      const response = await fetch('/api/whisper-asr', {
         method: 'POST',
         body: formData,
       });

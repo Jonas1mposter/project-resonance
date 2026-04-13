@@ -1,11 +1,10 @@
 /**
  * Cloudflare Pages Function: CosyVoice TTS Proxy (Gradio API adapter)
- *
- * Set COSYVOICE_API_URL in Cloudflare Pages environment variables.
+ * Uses VPC Service binding to reach private CosyVoice server via Cloudflare Tunnel.
  */
 
 interface Env {
-  COSYVOICE_API_URL?: string;
+  COSYVOICE_VPC: Fetcher;
 }
 
 const corsHeaders = {
@@ -23,12 +22,14 @@ function errorResponse(error: string, fallback = false) {
   );
 }
 
-/** Upload a file to Gradio and return the file reference object */
-async function uploadToGradio(api: string, file: File): Promise<Record<string, unknown>> {
+const INTERNAL_HOST = "http://cosyvoice-service";
+
+/** Upload a file to Gradio via VPC and return the file reference object */
+async function uploadToGradio(vpc: Fetcher, file: File): Promise<Record<string, unknown>> {
   const uploadForm = new FormData();
   uploadForm.append("files", file, file.name || "prompt.wav");
 
-  const res = await fetch(`${api}/gradio_api/upload`, {
+  const res = await vpc.fetch(`${INTERNAL_HOST}/gradio_api/upload`, {
     method: "POST",
     body: uploadForm,
   });
@@ -46,9 +47,9 @@ async function uploadToGradio(api: string, file: File): Promise<Record<string, u
 }
 
 /** Poll Gradio SSE endpoint for the audio URL */
-async function pollGradioResult(api: string, eventId: string): Promise<string | null> {
-  const sseUrl = `${api}/gradio_api/call/generate_audio/${eventId}`;
-  const res = await fetch(sseUrl);
+async function pollGradioResult(vpc: Fetcher, eventId: string): Promise<string | null> {
+  const sseUrl = `${INTERNAL_HOST}/gradio_api/call/generate_audio/${eventId}`;
+  const res = await vpc.fetch(sseUrl);
 
   if (!res.ok) {
     console.error("[cosyvoice-tts] SSE fetch failed:", res.status);
@@ -83,7 +84,8 @@ async function pollGradioResult(api: string, eventId: string): Promise<string | 
 }
 
 /** Fetch audio - handles both direct files and HLS playlists */
-async function fetchAudio(audioUrl: string): Promise<Uint8Array | null> {
+async function fetchAudio(vpc: Fetcher, audioUrl: string): Promise<Uint8Array | null> {
+  // Audio URLs from Gradio are absolute public URLs, fetch directly
   if (audioUrl.includes("playlist.m3u8")) {
     return await fetchHLSAudio(audioUrl);
   }
@@ -153,12 +155,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     });
   }
 
-  const baseUrl = env.COSYVOICE_API_URL || "https://cosyvoice-project-resonance.project-resonance.cn";
-  if (!baseUrl) {
-    return errorResponse("语音合成服务未配置，请联系管理员", true);
+  if (!env.COSYVOICE_VPC) {
+    return errorResponse("语音合成服务未配置 VPC 绑定", true);
   }
 
-  const api = baseUrl.replace(/\/$/, "");
+  const vpc = env.COSYVOICE_VPC;
 
   try {
     const contentType = request.headers.get("content-type") || "";
@@ -178,7 +179,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
 
       if (promptWav) {
-        promptFileRef = await uploadToGradio(api, promptWav);
+        promptFileRef = await uploadToGradio(vpc, promptWav);
       }
     } else {
       const body = await request.json() as any;
@@ -189,12 +190,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return errorResponse("请先「存为音色」后再朗读，当前服务需要参考音频", true);
     }
 
-    // Step 1: Submit job to Gradio
+    // Step 1: Submit job to Gradio via VPC
     const gradioData = [
       ttsText, mode, "", promptText, promptFileRef, null, "", 0, false, 1.0,
     ];
 
-    const submitRes = await fetch(`${api}/gradio_api/call/generate_audio`, {
+    const submitRes = await vpc.fetch(`${INTERNAL_HOST}/gradio_api/call/generate_audio`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ data: gradioData }),
@@ -206,14 +207,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     const { event_id } = await submitRes.json() as any;
 
-    // Step 2: Poll SSE for result
-    const audioUrl = await pollGradioResult(api, event_id);
+    // Step 2: Poll SSE for result via VPC
+    const audioUrl = await pollGradioResult(vpc, event_id);
     if (!audioUrl) {
       return errorResponse("语音合成失败，模型未返回音频", true);
     }
 
-    // Step 3: Fetch audio
-    const audioData = await fetchAudio(audioUrl);
+    // Step 3: Fetch audio (Gradio returns public URLs, use direct fetch)
+    const audioData = await fetchAudio(vpc, audioUrl);
     if (!audioData || audioData.length === 0) {
       return errorResponse("语音合成完成但音频下载失败，请重试", true);
     }
