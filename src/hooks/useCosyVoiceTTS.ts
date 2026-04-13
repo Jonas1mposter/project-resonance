@@ -77,9 +77,6 @@ export function useCosyVoiceTTS(): UseCosyVoiceTTSReturn {
     }
 
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl) throw new Error('未配置后端地址');
-
       setIsSpeaking(true);
 
       const promptBlob = await getPromptBlob();
@@ -88,27 +85,19 @@ export function useCosyVoiceTTS(): UseCosyVoiceTTSReturn {
       let response: Response;
 
       if (promptBlob) {
-        // Zero-shot mode: send prompt audio with request
         const formData = new FormData();
         formData.append('tts_text', text);
         formData.append('prompt_text', promptText);
         formData.append('prompt_wav', promptBlob, 'prompt.wav');
 
-        response = await fetch(`${supabaseUrl}/functions/v1/cosyvoice-tts`, {
+        response = await fetch('/api/cosyvoice-tts', {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
           body: formData,
         });
       } else {
-        // Default SFT mode
-        response = await fetch(`${supabaseUrl}/functions/v1/cosyvoice-tts`, {
+        response = await fetch('/api/cosyvoice-tts', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text }),
         });
       }
