@@ -37,7 +37,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     });
   }
 
-  const whisperUrl = env.WHISPER_API_URL;
+  const whisperUrl = env.WHISPER_API_URL || "https://whisper-project-resonance.project-resonance.cn";
   if (!whisperUrl) {
     return new Response(
       JSON.stringify({ ok: false, error: "ASR 服务尚未部署（WHISPER_API_URL 未配置）", fallback: true }),
