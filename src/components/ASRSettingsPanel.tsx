@@ -17,14 +17,11 @@ export default function ASRSettingsPanel({ settings, onUpdate }: ASRSettingsPane
     const check = async () => {
       setStatus('checking');
       try {
-        const res = await fetch('/api/whisper-asr', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ping: true }),
+        const res = await fetch('https://whisper-project-resonance.project-resonance.cn/health', {
+          method: 'GET',
         });
 
-        if (cancelled) return;
-        setStatus(res.status === 503 ? 'offline' : 'online');
+        setStatus(res.ok ? 'online' : 'offline');
       } catch {
         if (!cancelled) setStatus('offline');
       }
