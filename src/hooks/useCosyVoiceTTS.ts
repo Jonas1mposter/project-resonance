@@ -84,18 +84,20 @@ export function useCosyVoiceTTS(): UseCosyVoiceTTSReturn {
 
       let response: Response;
 
+      const cosyBase = 'https://cosyvoice-project-resonance.project-resonance.cn';
+
       if (promptBlob) {
         const formData = new FormData();
         formData.append('tts_text', text);
         formData.append('prompt_text', promptText);
         formData.append('prompt_wav', promptBlob, 'prompt.wav');
 
-        response = await fetch('/api/cosyvoice-tts', {
+        response = await fetch(`${cosyBase}/api/cosyvoice-tts`, {
           method: 'POST',
           body: formData,
         });
       } else {
-        response = await fetch('/api/cosyvoice-tts', {
+        response = await fetch(`${cosyBase}/api/cosyvoice-tts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text }),
