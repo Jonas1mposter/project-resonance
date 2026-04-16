@@ -8,6 +8,7 @@ import AudioRecorderButton from '@/components/AudioRecorderButton';
 import ASRStreamingResult from '@/components/ASRStreamingResult';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAccessibility } from '@/hooks/useAccessibility';
+import { useCorpusCollection } from '@/hooks/useCorpusCollection';
 import { toast } from 'sonner';
 
 interface UsagePageProps {
