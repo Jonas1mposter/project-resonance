@@ -47,6 +47,8 @@ export default function UsagePage({
     reset: resetASR,
   } = useWhisperASR();
 
+  const { collect: collectCorpus } = useCorpusCollection();
+
   // Handle transcript received from WeChat native recording
   useEffect(() => {
     if (wxTranscript) {
