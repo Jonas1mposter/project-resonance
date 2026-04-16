@@ -95,11 +95,13 @@ export default function UsagePage({
 
     if (text) {
       setLastTranscript(text);
+      // Auto-collect corpus in background
+      collectCorpus(webmBlob, text, result.duration || 0);
     }
 
     // Go straight to result — no auto-speak
     setFlowState('result');
-  }, [stopRecording, transcribe]);
+  }, [stopRecording, transcribe, collectCorpus]);
 
   const handleSaveVoice = useCallback(() => {
     const wav = lastWavBlobRef.current;
