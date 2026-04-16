@@ -53,6 +53,31 @@ function browserSpeechFallback(): Promise<string | null> {
   });
 }
 
+/**
+ * Call Gemini ASR edge function as fallback when Whisper is offline.
+ */
+async function geminiASRFallback(audioBlob: Blob): Promise<string | null> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (!supabaseUrl) return null;
+
+  const formData = new FormData();
+  formData.append('file', audioBlob, 'recording.webm');
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/gemini-asr`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+    },
+    body: formData,
+  });
+
+  const data = await response.json();
+  if (data.ok && data.text?.trim()) {
+    return data.text.trim();
+  }
+  return null;
+}
+
 export function useWhisperASR(): UseWhisperASRReturn {
   const [finalText, setFinalText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -98,20 +123,32 @@ export function useWhisperASR(): UseWhisperASRReturn {
       setIsProcessing(false);
       return text || null;
     } catch (err) {
-      // If Whisper is offline, try browser fallback
+      // If Whisper is offline, try Gemini ASR fallback
       if (whisperFailed) {
-        toast.info('Whisper 离线，正在尝试浏览器内置识别...');
+        toast.info('Whisper 离线，正在切换 Gemini 识别...');
 
-        const fallbackText = await browserSpeechFallback();
-        if (fallbackText) {
-          setFinalText(fallbackText);
-          setIsProcessing(false);
-          toast.success('已通过浏览器内置引擎识别（精度可能较低）');
-          return fallbackText;
+        try {
+          const geminiText = await geminiASRFallback(audioBlob);
+          if (geminiText) {
+            setFinalText(geminiText);
+            setIsProcessing(false);
+            toast.success('已通过 Gemini 云端识别');
+            return geminiText;
+          }
+        } catch (geminiErr) {
+          console.warn('[ASR] Gemini fallback failed:', geminiErr);
         }
 
-        // Fallback also failed
-        const message = '语音识别服务离线，且浏览器不支持内置识别。请重启 Whisper 服务。';
+        // Gemini failed, try browser Speech API as last resort
+        const browserText = await browserSpeechFallback();
+        if (browserText) {
+          setFinalText(browserText);
+          setIsProcessing(false);
+          toast.success('已通过浏览器内置引擎识别（精度可能较低）');
+          return browserText;
+        }
+
+        const message = '所有语音识别服务均不可用，请稍后重试。';
         setError(message);
         setIsProcessing(false);
         return null;
