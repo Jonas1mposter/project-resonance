@@ -8,6 +8,7 @@ import AudioRecorderButton from '@/components/AudioRecorderButton';
 import ASRStreamingResult from '@/components/ASRStreamingResult';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAccessibility } from '@/hooks/useAccessibility';
+import { useCorpusCollection } from '@/hooks/useCorpusCollection';
 import { toast } from 'sonner';
 
 interface UsagePageProps {
@@ -45,6 +46,8 @@ export default function UsagePage({
     transcribe,
     reset: resetASR,
   } = useWhisperASR();
+
+  const { collect: collectCorpus } = useCorpusCollection();
 
   // Handle transcript received from WeChat native recording
   useEffect(() => {
@@ -92,11 +95,13 @@ export default function UsagePage({
 
     if (text) {
       setLastTranscript(text);
+      // Auto-collect corpus in background
+      collectCorpus(webmBlob, text, result.duration || 0);
     }
 
     // Go straight to result — no auto-speak
     setFlowState('result');
-  }, [stopRecording, transcribe]);
+  }, [stopRecording, transcribe, collectCorpus]);
 
   const handleSaveVoice = useCallback(() => {
     const wav = lastWavBlobRef.current;

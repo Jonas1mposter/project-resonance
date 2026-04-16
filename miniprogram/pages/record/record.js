@@ -174,6 +174,8 @@ Page({
           const text = (data.text || '').trim();
           if (text) {
             this.setData({ state: 'result', transcript: text });
+            // Auto-collect corpus
+            this._collectCorpus(filePath, text);
           } else {
             this.setData({ state: 'result', transcript: '（未识别到语音内容）' });
           }
@@ -224,5 +226,57 @@ Page({
 
   goBack() {
     wx.navigateBack();
+  },
+
+  /**
+   * Auto-collect corpus: upload audio + insert record to Supabase
+   */
+  _collectCorpus(filePath, transcript) {
+    const ts = Date.now();
+    const fileName = `wx_corpus_${ts}.mp3`;
+    const storagePath = `corpus/${fileName}`;
+    const durationMs = Math.round((this._recordDuration || 0) * 1000);
+
+    // Upload audio file to storage
+    wx.uploadFile({
+      url: `${SUPABASE_URL}/storage/v1/object/dysarthria-audio/${storagePath}`,
+      filePath: filePath,
+      name: 'file',
+      header: {
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'x-upsert': 'false',
+      },
+      success: (res) => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          // Insert metadata record
+          wx.request({
+            url: `${SUPABASE_URL}/rest/v1/dysarthria_recordings`,
+            method: 'POST',
+            header: {
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+              apikey: SUPABASE_ANON_KEY,
+              'Content-Type': 'application/json',
+              Prefer: 'return=minimal',
+            },
+            data: {
+              file_name: fileName,
+              storage_path: storagePath,
+              label: transcript,
+              category: 'usage-collected',
+              duration_ms: durationMs,
+              metadata: {
+                source: 'wechat-miniprogram',
+                collected_at: new Date().toISOString(),
+              },
+            },
+            success: () => console.log('[Corpus] Collected:', fileName),
+            fail: (err) => console.warn('[Corpus] Insert failed:', err),
+          });
+        } else {
+          console.warn('[Corpus] Upload failed:', res.statusCode, res.data);
+        }
+      },
+      fail: (err) => console.warn('[Corpus] Upload error:', err),
+    });
   },
 });
