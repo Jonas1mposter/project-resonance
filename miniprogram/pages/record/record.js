@@ -174,6 +174,8 @@ Page({
           const text = (data.text || '').trim();
           if (text) {
             this.setData({ state: 'result', transcript: text });
+            // Auto-collect corpus
+            this._collectCorpus(filePath, text);
           } else {
             this.setData({ state: 'result', transcript: '（未识别到语音内容）' });
           }
