@@ -53,6 +53,31 @@ function browserSpeechFallback(): Promise<string | null> {
   });
 }
 
+/**
+ * Call Gemini ASR edge function as fallback when Whisper is offline.
+ */
+async function geminiASRFallback(audioBlob: Blob): Promise<string | null> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (!supabaseUrl) return null;
+
+  const formData = new FormData();
+  formData.append('file', audioBlob, 'recording.webm');
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/gemini-asr`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+    },
+    body: formData,
+  });
+
+  const data = await response.json();
+  if (data.ok && data.text?.trim()) {
+    return data.text.trim();
+  }
+  return null;
+}
+
 export function useWhisperASR(): UseWhisperASRReturn {
   const [finalText, setFinalText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);

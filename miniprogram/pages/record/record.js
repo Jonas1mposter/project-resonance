@@ -140,7 +140,12 @@ Page({
     retryCount = retryCount || 0;
     this.setData({ state: 'processing', statusText: retryCount > 0 ? `正在重试识别 (${retryCount}/2)...` : '正在识别语音...' });
 
-    console.log('[ASR] Uploading to:', `${SUPABASE_URL}/functions/v1/stepfun-asr`);
+    // Try Whisper first, fallback to Gemini
+    this._tryWhisperASR(filePath, retryCount);
+  },
+
+  _tryWhisperASR(filePath, retryCount) {
+    console.log('[ASR] Trying Whisper:', `${SUPABASE_URL}/functions/v1/stepfun-asr`);
 
     wx.uploadFile({
       url: `${SUPABASE_URL}/functions/v1/stepfun-asr`,
@@ -151,53 +156,81 @@ Page({
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
       },
       success: (res) => {
-        console.log('[ASR] statusCode:', res.statusCode, 'data:', res.data);
+        console.log('[ASR] Whisper statusCode:', res.statusCode, 'data:', res.data);
         try {
           const data = JSON.parse(res.data);
 
-          // Check for API-level errors
-          if (data.error) {
+          if (data.error || data.ok === false) {
             const status = data.status || res.statusCode;
-            // Retry on 503 service unavailable
             if ((status === 503 || status === 502) && retryCount < 2) {
               console.log('[ASR] Service unavailable, retrying in 2s...');
-              setTimeout(() => this._processRecording(filePath, retryCount + 1), 2000);
+              setTimeout(() => this._tryWhisperASR(filePath, retryCount + 1), 2000);
               return;
             }
-            this.setData({
-              state: 'error',
-              errorMsg: `识别服务错误 (${status}): ${data.error}`,
-            });
+            // Whisper failed, try Gemini
+            console.log('[ASR] Whisper failed, falling back to Gemini...');
+            this.setData({ statusText: '正在切换 Gemini 识别...' });
+            this._tryGeminiASR(filePath);
             return;
           }
 
           const text = (data.text || '').trim();
           if (text) {
             this.setData({ state: 'result', transcript: text });
-            // Auto-collect corpus
             this._collectCorpus(filePath, text);
           } else {
             this.setData({ state: 'result', transcript: '（未识别到语音内容）' });
           }
         } catch (e) {
-          console.error('[ASR] Parse error:', e, 'raw:', res.data);
+          console.error('[ASR] Parse error:', e);
+          this._tryGeminiASR(filePath);
+        }
+      },
+      fail: (err) => {
+        console.error('[ASR] Whisper upload error:', JSON.stringify(err));
+        // Network error, try Gemini
+        this.setData({ statusText: '正在切换 Gemini 识别...' });
+        this._tryGeminiASR(filePath);
+      },
+    });
+  },
+
+  _tryGeminiASR(filePath) {
+    console.log('[ASR] Trying Gemini:', `${SUPABASE_URL}/functions/v1/gemini-asr`);
+
+    wx.uploadFile({
+      url: `${SUPABASE_URL}/functions/v1/gemini-asr`,
+      filePath: filePath,
+      name: 'file',
+      header: {
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      success: (res) => {
+        console.log('[ASR] Gemini statusCode:', res.statusCode, 'data:', res.data);
+        try {
+          const data = JSON.parse(res.data);
+          if (data.ok && data.text) {
+            const text = data.text.trim();
+            if (text) {
+              this.setData({ state: 'result', transcript: text });
+              this._collectCorpus(filePath, text);
+              return;
+            }
+          }
+          this.setData({ state: 'result', transcript: '（未识别到语音内容）' });
+        } catch (e) {
+          console.error('[ASR] Gemini parse error:', e);
           this.setData({
             state: 'error',
-            errorMsg: '识别结果解析失败: ' + (res.data || '').slice(0, 100),
+            errorMsg: '所有识别服务均不可用，请稍后重试',
           });
         }
       },
       fail: (err) => {
-        console.error('[ASR] Upload error:', JSON.stringify(err));
-        let msg = '网络请求失败';
-        if (err.errMsg && err.errMsg.includes('url not in domain list')) {
-          msg = '域名未加入白名单。请在微信开发者工具中勾选「不校验合法域名」';
-        } else if (err.errMsg) {
-          msg = err.errMsg;
-        }
+        console.error('[ASR] Gemini upload error:', JSON.stringify(err));
         this.setData({
           state: 'error',
-          errorMsg: msg,
+          errorMsg: '所有识别服务均不可用，请检查网络',
         });
       },
     });
