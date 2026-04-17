@@ -175,7 +175,7 @@ export async function handleCosyVoiceTTS(request: Request, env: Env): Promise<Re
     const audioUrl = await pollGradioResult(vpc, event_id);
     if (!audioUrl) return errorResponse('语音合成失败，模型未返回音频', true);
 
-    const audioData = await fetchAudio(audioUrl);
+    const audioData = await fetchAudio(vpc, audioUrl);
     if (!audioData || audioData.length === 0) return errorResponse('语音合成完成但音频下载失败，请重试', true);
 
     const isHLS = audioUrl.includes('playlist.m3u8');
