@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, BookOpen, Settings, Keyboard } from 'lucide-react';
 import SkipToContent from './SkipToContent';
 import KeyboardShortcutsPanel from './KeyboardShortcutsPanel';
+import BuildBadge from './BuildBadge';
 import { useKeyboardShortcuts, useShortcutHelpPanel } from '@/hooks/useKeyboardShortcuts';
 import { useAccessibility } from '@/hooks/useAccessibility';
 import { shortcutGroups } from '@/data/shortcutGroups';
@@ -178,6 +179,9 @@ export default function Layout({ children }: LayoutProps) {
         onClose={closeShortcuts}
         groups={shortcutGroups}
       />
+
+      {/* Build timestamp badge (bottom-right, desktop only) */}
+      <BuildBadge />
     </div>
   );
 }
