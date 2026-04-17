@@ -86,9 +86,9 @@ export default function UsagePage({
       return;
     }
 
-    const { webmBlob, blob: wavBlob } = result;
+    const { webmBlob, wavBlob } = result;
 
-    // Save WAV for potential voice cloning later
+    // Save real WAV only for voice prompt; never masquerade webm as wav
     lastWavBlobRef.current = wavBlob;
 
     const text = await transcribe(webmBlob);
@@ -106,7 +106,7 @@ export default function UsagePage({
   const handleSaveVoice = useCallback(() => {
     const wav = lastWavBlobRef.current;
     if (!wav) {
-      toast.error('没有可用的录音，请重新录制');
+      toast.error('当前录音未能转换为标准 WAV，请重新录制后再存为音色');
       return;
     }
     onSetPromptAudio(wav, lastTranscript || undefined);

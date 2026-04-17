@@ -3,9 +3,9 @@ import { useState, useCallback, useRef } from 'react';
 interface RecordingResult {
   /** Compressed webm blob — small, ideal for ASR upload */
   webmBlob: Blob;
-  /** PCM WAV blob — needed by voice-cloning APIs */
-  wavBlob: Blob;
-  /** Alias for wavBlob (backward compat) */
+  /** PCM WAV blob — needed by voice-cloning APIs; null if conversion failed */
+  wavBlob: Blob | null;
+  /** Alias for wavBlob (backward compat); falls back to webmBlob */
   blob: Blob;
   duration: number;
 }
@@ -174,16 +174,16 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
           setError('录音时间太短，请重试');
           resolve(null);
         } else {
-          let wavBlob: Blob = webmBlob;
+          let wavBlob: Blob | null = null;
           if (includeWav) {
             try {
               wavBlob = await convertToWav(webmBlob);
             } catch (e) {
-              console.warn('WAV conversion failed, using webm as fallback:', e);
-              wavBlob = webmBlob;
+              console.warn('WAV conversion failed, voice prompt save disabled:', e);
+              wavBlob = null;
             }
           }
-          resolve({ webmBlob, wavBlob, blob: wavBlob, duration: finalDuration });
+          resolve({ webmBlob, wavBlob, blob: wavBlob ?? webmBlob, duration: finalDuration });
         }
       };
 

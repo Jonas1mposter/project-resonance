@@ -88,9 +88,11 @@ export function useCosyVoiceTTS(): UseCosyVoiceTTSReturn {
 
       if (promptBlob) {
         const formData = new FormData();
+        const promptMime = promptBlob.type || 'audio/wav';
+        const promptExt = promptMime.includes('wav') ? 'wav' : promptMime.includes('webm') ? 'webm' : promptMime.includes('ogg') ? 'ogg' : 'bin';
         formData.append('tts_text', text);
         formData.append('prompt_text', promptText);
-        formData.append('prompt_wav', promptBlob, 'prompt.wav');
+        formData.append('prompt_wav', promptBlob, `prompt.${promptExt}`);
 
         response = await fetch(`${apiBase}/api/cosyvoice-tts`, {
           method: 'POST',
