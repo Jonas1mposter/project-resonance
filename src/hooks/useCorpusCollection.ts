@@ -1,53 +1,54 @@
 import { useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Silently collects speech corpus (audio + transcript) to the database
- * after each successful ASR recognition.
+ * Silently collects speech corpus (audio + transcript) to the Tencent Cloud
+ * VPS service after each successful ASR recognition.
+ *
+ * Endpoint: https://corpus.sg.superbrain-ai.com/api/corpus
+ * Storage: server-side disk (audio) + SQLite (metadata)
+ *
+ * Failures are swallowed — corpus collection must never disrupt the user flow.
  */
+
+const CORPUS_API = 'https://corpus.sg.superbrain-ai.com/api/corpus';
+
 export function useCorpusCollection() {
   const collect = useCallback(async (audioBlob: Blob, transcript: string, durationSec: number) => {
     try {
       const ts = Date.now();
-      const ext = audioBlob.type.includes('webm') ? 'webm' : audioBlob.type.includes('mp3') ? 'mp3' : 'wav';
-      const fileName = `corpus_${ts}.${ext}`;
-      const storagePath = `corpus/${fileName}`;
+      const ext = audioBlob.type.includes('webm')
+        ? 'webm'
+        : audioBlob.type.includes('mp3')
+        ? 'mp3'
+        : audioBlob.type.includes('wav')
+        ? 'wav'
+        : 'bin';
+      const fileName = `web_${ts}.${ext}`;
 
-      // Upload audio to storage
-      const { error: uploadError } = await supabase.storage
-        .from('dysarthria-audio')
-        .upload(storagePath, audioBlob, {
-          contentType: audioBlob.type || 'audio/webm',
-          upsert: false,
-        });
+      const form = new FormData();
+      form.append('file', audioBlob, fileName);
+      form.append('label', transcript);
+      form.append('duration_ms', String(Math.round(durationSec * 1000)));
+      form.append('source', 'web');
+      form.append(
+        'metadata',
+        JSON.stringify({
+          user_agent: navigator.userAgent,
+          locale: navigator.language,
+          collected_at: new Date().toISOString(),
+          mime_type: audioBlob.type || 'audio/webm',
+        }),
+      );
 
-      if (uploadError) {
-        console.warn('[Corpus] Upload failed:', uploadError.message);
+      const res = await fetch(CORPUS_API, { method: 'POST', body: form });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data?.ok) {
+        console.warn('[Corpus] Upload failed:', res.status, data);
         return;
       }
 
-      // Insert metadata record
-      const { error: insertError } = await supabase
-        .from('dysarthria_recordings')
-        .insert({
-          file_name: fileName,
-          storage_path: storagePath,
-          label: transcript,
-          category: 'usage-collected',
-          duration_ms: Math.round(durationSec * 1000),
-          metadata: {
-            source: 'auto-collect',
-            user_agent: navigator.userAgent,
-            collected_at: new Date().toISOString(),
-          },
-        });
-
-      if (insertError) {
-        console.warn('[Corpus] Insert failed:', insertError.message);
-        return;
-      }
-
-      console.log('[Corpus] Collected:', fileName, transcript.slice(0, 30));
+      console.log('[Corpus] Collected:', data.file_name, transcript.slice(0, 30));
     } catch (err) {
       console.warn('[Corpus] Collection error:', err);
     }
