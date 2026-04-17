@@ -10,7 +10,10 @@ import { useCallback } from 'react';
  * Failures are swallowed — corpus collection must never disrupt the user flow.
  */
 
-const CORPUS_API = 'https://corpus.sg.superbrain-ai.com/api/corpus';
+// Routed through Cloudflare Worker (`/api/corpus`) which proxies to the
+// Tencent Cloud VPS. Keeps the browser on a same-origin path and avoids
+// mixed-content / CORS issues.
+const CORPUS_API = `${import.meta.env.VITE_WORKER_API_URL || ''}/api/corpus`;
 
 export function useCorpusCollection() {
   const collect = useCallback(async (audioBlob: Blob, transcript: string, durationSec: number) => {
