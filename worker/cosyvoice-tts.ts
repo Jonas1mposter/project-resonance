@@ -35,8 +35,9 @@ async function pollGradioResult(vpc: Fetcher, eventId: string): Promise<string |
   console.log('[cosyvoice-tts] SSE response:', text.substring(0, 1000));
 
   const lines = text.split('\n');
-  let generatingUrl: string | null = null;
-  let completeUrl: string | null = null;
+  let completeWav: string | null = null;
+  let completeAny: string | null = null;
+  let generatingWav: string | null = null;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -48,14 +49,19 @@ async function pollGradioResult(vpc: Fetcher, eventId: string): Promise<string |
         let url: string | null = null;
         if (item?.url && typeof item.url === 'string') url = item.url;
         else if (item?.path && typeof item.path === 'string') url = `${INTERNAL}/gradio_api/file=${item.path}`;
-        if (url) {
-          if (eventLine.includes('complete')) completeUrl = url;
-          else if (eventLine.includes('generating')) generatingUrl = url;
+        if (!url) continue;
+        const isM3u8 = url.includes('.m3u8');
+        if (eventLine.includes('complete')) {
+          completeAny = url;
+          if (!isM3u8) completeWav = url;
+        } else if (eventLine.includes('generating') && !isM3u8) {
+          generatingWav = url;
         }
       } catch { /* continue */ }
     }
   }
-  return completeUrl || generatingUrl || null;
+  // Prefer non-m3u8 (direct wav) URLs; fall back to any complete URL only if no wav available
+  return completeWav || generatingWav || completeAny || null;
 }
 
 async function fetchAudio(vpc: Fetcher, audioUrl: string | null | undefined): Promise<Uint8Array | null> {
