@@ -262,49 +262,30 @@ Page({
   },
 
   /**
-   * Auto-collect corpus: upload audio + insert record to Supabase
+   * Auto-collect corpus: upload audio + transcript to Tencent Cloud VPS service.
+   * Endpoint: https://corpus.sg.superbrain-ai.com/api/corpus
+   * Failures are swallowed — collection must never disrupt the user flow.
    */
   _collectCorpus(filePath, transcript) {
-    const ts = Date.now();
-    const fileName = `wx_corpus_${ts}.mp3`;
-    const storagePath = `corpus/${fileName}`;
     const durationMs = Math.round((this._recordDuration || 0) * 1000);
 
-    // Upload audio file to storage
     wx.uploadFile({
-      url: `${SUPABASE_URL}/storage/v1/object/dysarthria-audio/${storagePath}`,
+      url: 'https://corpus.sg.superbrain-ai.com/api/corpus',
       filePath: filePath,
       name: 'file',
-      header: {
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        'x-upsert': 'false',
+      formData: {
+        label: transcript,
+        duration_ms: String(durationMs),
+        source: 'wechat-miniprogram',
+        category: 'usage-collected',
+        metadata: JSON.stringify({
+          source: 'wechat-miniprogram',
+          collected_at: new Date().toISOString(),
+        }),
       },
       success: (res) => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          // Insert metadata record
-          wx.request({
-            url: `${SUPABASE_URL}/rest/v1/dysarthria_recordings`,
-            method: 'POST',
-            header: {
-              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-              apikey: SUPABASE_ANON_KEY,
-              'Content-Type': 'application/json',
-              Prefer: 'return=minimal',
-            },
-            data: {
-              file_name: fileName,
-              storage_path: storagePath,
-              label: transcript,
-              category: 'usage-collected',
-              duration_ms: durationMs,
-              metadata: {
-                source: 'wechat-miniprogram',
-                collected_at: new Date().toISOString(),
-              },
-            },
-            success: () => console.log('[Corpus] Collected:', fileName),
-            fail: (err) => console.warn('[Corpus] Insert failed:', err),
-          });
+          console.log('[Corpus] Collected:', res.data);
         } else {
           console.warn('[Corpus] Upload failed:', res.statusCode, res.data);
         }
