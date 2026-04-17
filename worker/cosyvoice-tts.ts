@@ -28,7 +28,7 @@ async function uploadToGradio(vpc: Fetcher, file: File): Promise<Record<string, 
 }
 
 async function pollGradioResult(vpc: Fetcher, eventId: string): Promise<string | null> {
-  const res = await vpc.fetch(`${INTERNAL}/gradio_api/call/generate_audio/${eventId}`);
+  const res = await vpc.fetch(`${INTERNAL}/call/generate_audio/${eventId}`);
   if (!res.ok) { console.error('[cosyvoice-tts] SSE fetch failed:', res.status); return null; }
 
   const text = await res.text();
