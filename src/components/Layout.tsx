@@ -179,6 +179,9 @@ export default function Layout({ children }: LayoutProps) {
         onClose={closeShortcuts}
         groups={shortcutGroups}
       />
+
+      {/* Build timestamp badge (bottom-right, desktop only) */}
+      <BuildBadge />
     </div>
   );
 }
