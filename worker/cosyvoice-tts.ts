@@ -44,9 +44,13 @@ async function pollGradioResult(vpc: Fetcher, eventId: string): Promise<string |
       const eventLine = lines[i - 1];
       try {
         const data = JSON.parse(line.substring(6));
-        if (Array.isArray(data) && data[0]?.url) {
-          if (eventLine.includes('complete')) completeUrl = data[0].url;
-          else if (eventLine.includes('generating')) generatingUrl = data[0].url;
+        const item = Array.isArray(data) ? data[0] : null;
+        let url: string | null = null;
+        if (item?.url && typeof item.url === 'string') url = item.url;
+        else if (item?.path && typeof item.path === 'string') url = `${INTERNAL}/gradio_api/file=${item.path}`;
+        if (url) {
+          if (eventLine.includes('complete')) completeUrl = url;
+          else if (eventLine.includes('generating')) generatingUrl = url;
         }
       } catch { /* continue */ }
     }
@@ -54,7 +58,11 @@ async function pollGradioResult(vpc: Fetcher, eventId: string): Promise<string |
   return completeUrl || generatingUrl || null;
 }
 
-async function fetchAudio(vpc: Fetcher, audioUrl: string): Promise<Uint8Array | null> {
+async function fetchAudio(vpc: Fetcher, audioUrl: string | null | undefined): Promise<Uint8Array | null> {
+  if (!audioUrl || typeof audioUrl !== 'string') {
+    console.error('[cosyvoice-tts] fetchAudio called with invalid url:', audioUrl);
+    return null;
+  }
   if (audioUrl.includes('playlist.m3u8')) return fetchHLSAudio(vpc, audioUrl);
   const internal = toInternal(audioUrl);
   const res = await vpc.fetch(internal);
