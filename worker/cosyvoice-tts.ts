@@ -54,36 +54,60 @@ async function pollGradioResult(vpc: Fetcher, eventId: string): Promise<string |
   return completeUrl || generatingUrl || null;
 }
 
-async function fetchAudio(audioUrl: string): Promise<Uint8Array | null> {
-  if (audioUrl.includes('playlist.m3u8')) return fetchHLSAudio(audioUrl);
-  const res = await fetch(audioUrl);
+async function fetchAudio(vpc: Fetcher, audioUrl: string): Promise<Uint8Array | null> {
+  if (audioUrl.includes('playlist.m3u8')) return fetchHLSAudio(vpc, audioUrl);
+  const res = await vpc.fetch(audioUrl);
   if (!res.ok) return null;
   return new Uint8Array(await res.arrayBuffer());
 }
 
-async function fetchHLSAudio(playlistUrl: string): Promise<Uint8Array | null> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const res = await fetch(playlistUrl);
-    if (!res.ok) return null;
+/** Rewrite a public Gradio URL to the internal VPC host so requests go through the binding */
+function toInternal(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${INTERNAL}${u.pathname}${u.search}`;
+  } catch {
+    return url;
+  }
+}
+
+async function fetchHLSAudio(vpc: Fetcher, playlistUrl: string): Promise<Uint8Array | null> {
+  const internalPlaylist = toInternal(playlistUrl);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const res = await vpc.fetch(internalPlaylist);
+    if (!res.ok) { console.error('[cosyvoice-tts] m3u8 fetch failed:', res.status); return null; }
 
     const m3u8 = await res.text();
-    const baseUrl = playlistUrl.substring(0, playlistUrl.lastIndexOf('/') + 1);
+    const ended = m3u8.includes('#EXT-X-ENDLIST');
+    const baseUrl = internalPlaylist.substring(0, internalPlaylist.lastIndexOf('/') + 1);
     const segments: string[] = [];
     for (const line of m3u8.split('\n')) {
       const t = line.trim();
       if (t && !t.startsWith('#')) segments.push(t);
     }
-    if (segments.length === 0) { await new Promise(r => setTimeout(r, 2000)); continue; }
+    console.log('[cosyvoice-tts] m3u8 attempt', attempt + 1, 'segments:', segments.length, 'ended:', ended);
+
+    if (segments.length === 0) {
+      if (ended) return null; // ended with no segments → real failure
+      await new Promise(r => setTimeout(r, 1500));
+      continue;
+    }
 
     const chunks: Uint8Array[] = [];
     for (const seg of segments) {
-      const segUrl = seg.startsWith('http') ? seg : `${baseUrl}${seg}`;
-      const segRes = await fetch(segUrl);
+      const segUrl = seg.startsWith('http') ? toInternal(seg) : `${baseUrl}${seg}`;
+      const segRes = await vpc.fetch(segUrl);
       if (segRes.ok) chunks.push(new Uint8Array(await segRes.arrayBuffer()));
     }
 
     const totalLen = chunks.reduce((s, c) => s + c.length, 0);
-    if (totalLen < 500) { await new Promise(r => setTimeout(r, 2000)); continue; }
+    // If playlist hasn't ended and we have very little audio, wait for more segments
+    if (!ended && totalLen < 2000) {
+      await new Promise(r => setTimeout(r, 1500));
+      continue;
+    }
+
+    if (totalLen === 0) return null;
 
     const result = new Uint8Array(totalLen);
     let offset = 0;
