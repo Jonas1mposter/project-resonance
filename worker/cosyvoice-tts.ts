@@ -56,8 +56,12 @@ async function pollGradioResult(vpc: Fetcher, eventId: string): Promise<string |
 
 async function fetchAudio(vpc: Fetcher, audioUrl: string): Promise<Uint8Array | null> {
   if (audioUrl.includes('playlist.m3u8')) return fetchHLSAudio(vpc, audioUrl);
-  const res = await vpc.fetch(audioUrl);
-  if (!res.ok) return null;
+  const internal = toInternal(audioUrl);
+  const res = await vpc.fetch(internal);
+  if (!res.ok) {
+    console.error('[cosyvoice-tts] audio fetch failed:', res.status, internal);
+    return null;
+  }
   return new Uint8Array(await res.arrayBuffer());
 }
 
