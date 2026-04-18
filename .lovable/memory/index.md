@@ -6,6 +6,7 @@ Updated: just now
 ## Core
 - **Mission**: Accessibility-first product for users with dysarthria and elderly users. Every UX/perf/compat decision must serve this.
 - **Browser compat**: Must work on cheap/old domestic Chinese phones — old Android WebView, QQ/UC/百度/华为/小米 browsers, WeChat WebView. No bleeding-edge JS/CSS without polyfill or fallback. Test against ES2015 baseline (already enforced in vite.config.ts).
+- **All API calls via Worker**: Browser MUST only hit same-origin `/api/*` (Cloudflare Worker). Never call `*.supabase.co`, `googleapis.com`, etc. directly — China network blocks/flakes them. Add new Worker route for every external API.
 - Architecture: Cloudflare Worker proxy via VPC bindings (`http://127.0.0.1`), relative paths `/api/*`.
 - **Portability rule**: Cloudflare-first but NEVER hard-bind to Lovable — no `lovable.app` URLs, no Lovable SDKs, no project IDs in runtime code. Must run under `wrangler dev` standalone.
 - Agent Boundary: NEVER modify backend GPU/Python code (Whisper/CosyVoice). User handles deployment.
@@ -16,6 +17,7 @@ Updated: just now
 - Corpus: Auto-collected speech corpus → Tencent Cloud VPS (`https://corpus.sg.superbrain-ai.com/api/corpus`), NOT Supabase.
 
 ## Memories
+- [All API via Worker](mem://constraints/api-traffic-via-worker) — Browser must only hit same-origin /api/*; never call Supabase/Google directly from China
 - [Cloudflare-First Portability](mem://constraints/portability) — Build for CF edge but keep code portable; no Lovable lock-in
 - [Cloudflare Worker Architecture](mem://tech/architecture) — CF Worker proxying ASR/TTS via VPC bindings to bypass Lovable API limits
 - [Corpus Collection Server](mem://tech/corpus-collection-server) — Self-hosted Node.js+SQLite API on Tencent Cloud VPS for speech corpus

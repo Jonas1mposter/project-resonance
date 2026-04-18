@@ -62,6 +62,9 @@ export default function AuthPage() {
     setLoading(true);
     try {
       const cleanPhone = phone.replace(/\D/g, '');
+      // TODO(portability): route through Worker `/api/sms-send-otp` instead of
+      // calling Supabase Edge Functions directly. Currently disabled (ICP), so
+      // this code path is unreachable; fix before re-enabling auth.
       const { data, error } = await supabase.functions.invoke('sms-send-otp', {
         body: { phone: cleanPhone },
       });
@@ -90,6 +93,7 @@ export default function AuthPage() {
     setLoading(true);
     try {
       const cleanPhone = phone.replace(/\D/g, '');
+      // TODO(portability): route through Worker `/api/sms-verify-otp` (see above).
       const { data, error } = await supabase.functions.invoke('sms-verify-otp', {
         body: { phone: cleanPhone, code: otp, displayName: displayName || undefined },
       });

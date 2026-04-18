@@ -5,6 +5,7 @@
 
 import { handleWhisperASR } from './whisper-asr';
 import { handleCosyVoiceTTS } from './cosyvoice-tts';
+import { handleGeminiASR } from './gemini-asr';
 import { handleCorpus } from './corpus';
 import { handleClientLogs } from './client-logs';
 
@@ -36,6 +37,9 @@ export default {
     try {
       if (path === '/api/whisper-asr') {
         return await handleWhisperASR(request, env);
+      }
+      if (path === '/api/gemini-asr') {
+        return await handleGeminiASR(request, env);
       }
       if (path === '/api/cosyvoice-tts') {
         return await handleCosyVoiceTTS(request, env);
