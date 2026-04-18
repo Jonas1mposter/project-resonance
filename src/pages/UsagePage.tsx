@@ -6,6 +6,7 @@ import { useWhisperASR } from '@/hooks/useWhisperASR';
 import { useWechatBridge, getWechatDebugInfo } from '@/hooks/useWechatBridge';
 import AudioRecorderButton from '@/components/AudioRecorderButton';
 import ASRStreamingResult from '@/components/ASRStreamingResult';
+import ASREngineIndicator from '@/components/ASREngineIndicator';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAccessibility } from '@/hooks/useAccessibility';
 import { useCorpusCollection } from '@/hooks/useCorpusCollection';
@@ -45,6 +46,8 @@ export default function UsagePage({
     error: asrError,
     transcribe,
     reset: resetASR,
+    engine: asrEngine,
+    engineStage: asrEngineStage,
   } = useWhisperASR();
 
   const { collect: collectCorpus } = useCorpusCollection();
@@ -285,13 +288,15 @@ export default function UsagePage({
             <div className="absolute inset-0 rounded-full border-[3px] border-primary border-t-transparent animate-spin" aria-hidden="true" />
           </div>
           <p className="relative text-foreground font-semibold">正在识别语音...</p>
-          <p className="relative text-xs text-muted-foreground animate-pulse">正在上传压缩音频</p>
+          <ASREngineIndicator engine={asrEngine} stage={asrEngineStage} className="relative" />
         </motion.div>
       )}
 
       {/* Results — user chooses action */}
       {flowState === 'result' && (
         <>
+          {/* Always show the engine chain so users see which layer succeeded */}
+          <ASREngineIndicator engine={asrEngine} stage={asrEngineStage} />
           {displayText ? (
             <ASRStreamingResult
               partialText=""
