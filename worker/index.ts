@@ -6,6 +6,7 @@
 import { handleWhisperASR } from './whisper-asr';
 import { handleCosyVoiceTTS } from './cosyvoice-tts';
 import { handleCorpus } from './corpus';
+import { handleClientLogs } from './client-logs';
 
 export interface Env {
   WHISPER_VPC: Fetcher;
