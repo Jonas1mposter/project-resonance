@@ -84,6 +84,15 @@ export async function handleCosyVoiceTTS(request: Request, env: Env): Promise<Re
     if (!ttsText) return errorResponse("Missing 'tts_text'");
     if (!promptWav) return errorResponse('缺少参考音频 prompt_wav', true);
 
+    // Validate RIFF/WAVE header before forwarding (FastAPI/soundfile will crash otherwise)
+    const headerBuf = new Uint8Array(await promptWav.slice(0, 12).arrayBuffer());
+    const riff = String.fromCharCode(headerBuf[0], headerBuf[1], headerBuf[2], headerBuf[3]);
+    const wave = String.fromCharCode(headerBuf[8], headerBuf[9], headerBuf[10], headerBuf[11]);
+    if (riff !== 'RIFF' || wave !== 'WAVE') {
+      console.error('[cosyvoice-tts] invalid wav header, magic=', riff, wave, 'size=', promptWav.size);
+      return errorResponse('参考音频不是有效的 WAV 格式，请在前端清除音色后重新录制', true);
+    }
+
     // Forward to FastAPI /inference_zero_shot
     const upstreamForm = new FormData();
     upstreamForm.append('tts_text', ttsText);
