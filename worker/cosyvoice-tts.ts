@@ -97,8 +97,14 @@ export async function handleCosyVoiceTTS(request: Request, env: Env): Promise<Re
 
     if (!upstream.ok) {
       const errText = await upstream.text().catch(() => '');
-      console.error('[cosyvoice-tts] upstream failed:', upstream.status, errText.substring(0, 500));
-      return errorResponse(`语音合成失败 (${upstream.status})`, true);
+      console.error('[cosyvoice-tts] upstream failed:', upstream.status, errText.substring(0, 1000));
+      // Try to extract FastAPI's {detail: "..."} message
+      let detail = errText.substring(0, 300);
+      try {
+        const j = JSON.parse(errText);
+        if (j?.detail) detail = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail);
+      } catch { /* not json */ }
+      return errorResponse(`语音合成失败 (${upstream.status}): ${detail}`, true);
     }
 
     // Buffer raw PCM stream, then prepend WAV header.
