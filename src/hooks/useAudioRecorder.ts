@@ -67,6 +67,18 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
   const startRecording = useCallback(async () => {
     try {
       setError(null);
+
+      // Pre-flight: catch common mobile/HTTPS issues with clearer messages
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError('当前浏览器不支持录音。请用微信内置浏览器或最新版 Chrome/Safari 打开');
+        return;
+      }
+      const isSecure = window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (!isSecure) {
+        setError('录音需要 HTTPS。请通过 https:// 地址访问本页面');
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
@@ -102,8 +114,23 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
 
       startLevelMonitoring(stream);
     } catch (err) {
-      setError('无法访问麦克风，请检查权限设置');
       console.error('Recording error:', err);
+      const name = (err as DOMException)?.name || '';
+      const msg = (err as Error)?.message || '';
+
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || /denied|not allowed/i.test(msg)) {
+        setError('麦克风权限被拒绝。请在浏览器设置→网站权限中允许本站使用麦克风后刷新页面');
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setError('未检测到麦克风设备');
+      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+        setError('麦克风被其他应用占用，请关闭后重试');
+      } else if (name === 'SecurityError' || /secure|https/i.test(msg)) {
+        setError('录音需要 HTTPS 安全上下文。请通过 https:// 地址访问');
+      } else if (name === 'AbortError') {
+        setError('录音被中断，请重试');
+      } else {
+        setError(`无法访问麦克风：${msg || '未知错误'}`);
+      }
     }
   }, [startLevelMonitoring]);
 
