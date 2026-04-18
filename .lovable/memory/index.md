@@ -17,6 +17,7 @@ Updated: just now
 - Corpus: Auto-collected speech corpus → Tencent Cloud VPS (`https://corpus.sg.superbrain-ai.com/api/corpus`), NOT Supabase.
 
 ## Memories
+- [All API via Worker](mem://constraints/api-traffic-via-worker) — Browser must only hit same-origin /api/*; never call Supabase/Google directly from China
 - [Cloudflare-First Portability](mem://constraints/portability) — Build for CF edge but keep code portable; no Lovable lock-in
 - [Cloudflare Worker Architecture](mem://tech/architecture) — CF Worker proxying ASR/TTS via VPC bindings to bypass Lovable API limits
 - [Corpus Collection Server](mem://tech/corpus-collection-server) — Self-hosted Node.js+SQLite API on Tencent Cloud VPS for speech corpus
