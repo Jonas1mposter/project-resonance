@@ -236,17 +236,20 @@ export default function UsagePage({
         </motion.div>
       </div>
 
-      {/* Keyboard hint */}
+      {/* Engine selector — visible whenever the user is about to record */}
       {flowState === 'idle' && (
         <motion.div
           initial={isMotionReduced ? {} : { opacity: 0 }}
           animate={isMotionReduced ? {} : { opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="flex items-center justify-center gap-2 text-xs text-muted-foreground"
+          transition={{ delay: 0.15 }}
+          className="space-y-2"
         >
-          <span>按</span>
-          <kbd className="kbd-hint">空格</kbd>
-          <span>开始录音</span>
+          <ASREngineSelector value={enginePref} onChange={setEnginePref} />
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <span>按</span>
+            <kbd className="kbd-hint">空格</kbd>
+            <span>开始录音</span>
+          </div>
         </motion.div>
       )}
 
