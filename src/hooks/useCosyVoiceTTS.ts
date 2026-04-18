@@ -164,6 +164,25 @@ export function useCosyVoiceTTS(): UseCosyVoiceTTSReturn {
       audioRef.current = null;
     }
 
+    // CRITICAL: Create Audio element synchronously inside the user gesture.
+    // Mobile browsers (iOS Safari, WeChat) require play() to be tied to a
+    // direct user gesture; any await before `new Audio()` breaks the chain.
+    const audio = new Audio();
+    audioRef.current = audio;
+    // Prime the element within gesture context so later .play() is allowed
+    try {
+      audio.muted = true;
+      const primePromise = audio.play();
+      if (primePromise && typeof primePromise.catch === 'function') {
+        primePromise.catch(() => undefined);
+      }
+      audio.pause();
+      audio.muted = false;
+      audio.currentTime = 0;
+    } catch {
+      /* ignore prime errors */
+    }
+
     try {
       setIsSpeaking(true);
 
@@ -226,9 +245,8 @@ export function useCosyVoiceTTS(): UseCosyVoiceTTSReturn {
 
       const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
 
+      audio.src = audioUrl;
       audio.onended = () => {
         setIsSpeaking(false);
         URL.revokeObjectURL(audioUrl);
@@ -238,7 +256,17 @@ export function useCosyVoiceTTS(): UseCosyVoiceTTSReturn {
         URL.revokeObjectURL(audioUrl);
       };
 
-      await audio.play();
+      try {
+        await audio.play();
+      } catch (playErr) {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        const msg = playErr instanceof Error ? playErr.message : '';
+        if (msg.includes('user gesture') || msg.includes('not allowed') || msg.includes('NotAllowed')) {
+          throw new Error('请在页面上轻触一下后再点朗读（浏览器要求用户手势）');
+        }
+        throw playErr;
+      }
     } catch (err) {
       setIsSpeaking(false);
       const message = err instanceof Error ? err.message : 'TTS 播放失败';
