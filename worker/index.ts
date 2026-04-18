@@ -38,6 +38,9 @@ export default {
       if (path === '/api/corpus') {
         return await handleCorpus(request);
       }
+      if (path === '/api/client-logs') {
+        return await handleClientLogs(request);
+      }
       // All other routes: serve static assets (SPA)
       return env.ASSETS.fetch(request);
     } catch (err) {
