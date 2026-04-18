@@ -88,7 +88,42 @@ export function useWhisperASR(): UseWhisperASRReturn {
     setIsProcessing(true);
     setFinalText('');
 
-    let whisperFailed = false;
+    /**
+     * Three-tier ASR fallback chain:
+     *   1. Worker → Whisper (self-hosted, primary)
+     *   2. Gemini ASR edge function (cloud fallback)
+     *   3. Browser Web Speech API (last-resort offline fallback)
+     *
+     * The Worker has its own internal Whisper→Gemini fallback, so the
+     * client-side Gemini step covers the case where the Worker itself is
+     * unreachable (404, network error, etc.).
+     */
+    const tryGeminiThenBrowser = async (notify = true): Promise<string | null> => {
+      try {
+        const geminiText = await geminiASRFallback(audioBlob);
+        if (geminiText) {
+          setFinalText(geminiText);
+          setIsProcessing(false);
+          if (notify) toast.success('已通过 Gemini 云端识别');
+          return geminiText;
+        }
+      } catch (geminiErr) {
+        console.warn('[ASR] Gemini fallback failed:', geminiErr);
+      }
+
+      const browserText = await browserSpeechFallback();
+      if (browserText) {
+        setFinalText(browserText);
+        setIsProcessing(false);
+        if (notify) toast.success('已通过浏览器内置引擎识别（精度可能较低）');
+        return browserText;
+      }
+
+      const message = '所有语音识别服务均不可用，请稍后重试';
+      setError(message);
+      setIsProcessing(false);
+      return null;
+    };
 
     try {
       const formData = new FormData();
@@ -100,64 +135,41 @@ export function useWhisperASR(): UseWhisperASRReturn {
         body: formData,
       });
 
-      const data = await response.json().catch(() => ({}));
-
-      if (data.ok === false) {
-        whisperFailed = true;
-        throw new Error(data.error || '识别服务暂时不可用');
-      }
-
+      // Hard failure (404, 5xx, etc.) — Worker itself is down
       if (!response.ok) {
-        whisperFailed = true;
-        throw new Error(data.error || `请求失败 (${response.status})`);
+        console.warn('[ASR] Worker returned', response.status, '→ fallback');
+        toast.info('主识别服务不可用，正在切换备用引擎...');
+        return await tryGeminiThenBrowser();
       }
 
-      const text = data.text?.trim() || '';
+      const data = await response.json().catch(() => ({} as any));
 
+      // Soft failure — Worker reached but ASR engine returned error envelope
+      if (data.ok === false) {
+        console.warn('[ASR] Worker returned ok:false →', data.error);
+        toast.info('Whisper 离线，正在切换 Gemini 识别...');
+        return await tryGeminiThenBrowser();
+      }
+
+      const text = (data.text || '').trim();
       if (text) {
         setFinalText(text);
-      } else {
-        setError('未能识别到语音内容');
-      }
-
-      setIsProcessing(false);
-      return text || null;
-    } catch (err) {
-      // If Whisper is offline, try Gemini ASR fallback
-      if (whisperFailed) {
-        toast.info('Whisper 离线，正在切换 Gemini 识别...');
-
-        try {
-          const geminiText = await geminiASRFallback(audioBlob);
-          if (geminiText) {
-            setFinalText(geminiText);
-            setIsProcessing(false);
-            toast.success('已通过 Gemini 云端识别');
-            return geminiText;
-          }
-        } catch (geminiErr) {
-          console.warn('[ASR] Gemini fallback failed:', geminiErr);
+        // Inform user when Worker already fell back to Gemini internally
+        if (data.source === 'gemini' || data.fallback) {
+          toast.info('已通过 Gemini 云端识别');
         }
-
-        // Gemini failed, try browser Speech API as last resort
-        const browserText = await browserSpeechFallback();
-        if (browserText) {
-          setFinalText(browserText);
-          setIsProcessing(false);
-          toast.success('已通过浏览器内置引擎识别（精度可能较低）');
-          return browserText;
-        }
-
-        const message = '所有语音识别服务均不可用，请稍后重试。';
-        setError(message);
         setIsProcessing(false);
-        return null;
+        return text;
       }
 
-      const message = err instanceof Error ? err.message : '识别失败';
-      setError(message);
+      setError('未能识别到语音内容');
       setIsProcessing(false);
       return null;
+    } catch (err) {
+      // Network error / fetch threw → Worker unreachable
+      console.warn('[ASR] Worker fetch threw, falling back:', err);
+      toast.info('网络异常，正在切换备用识别引擎...');
+      return await tryGeminiThenBrowser();
     }
   }, []);
 
