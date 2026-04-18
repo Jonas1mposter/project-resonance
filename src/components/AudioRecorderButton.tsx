@@ -2,6 +2,7 @@ import { useCallback, useRef } from 'react';
 import { Mic, Square } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAccessibility } from '@/hooks/useAccessibility';
+import AudioSpectrum from './AudioSpectrum';
 
 interface AudioRecorderButtonProps {
   isRecording: boolean;
@@ -131,6 +132,13 @@ export default function AudioRecorderButton({
             <Mic className={iconSize} aria-hidden="true" />
           )}
         </motion.button>
+      )}
+
+      {/* Live spectrum — only visible while recording */}
+      {isRecording && (
+        <div className="w-full max-w-xs">
+          <AudioSpectrum level={audioLevel} active={isRecording} />
+        </div>
       )}
 
       {isRecording ? (
