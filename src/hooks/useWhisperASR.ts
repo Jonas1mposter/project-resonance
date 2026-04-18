@@ -10,11 +10,16 @@ export type ASREngineStage =
   | 'success'
   | 'failed';
 
+interface TranscribeOptions {
+  /** Force a specific engine. When set, no fallback is performed. */
+  prefer?: 'auto' | 'whisper' | 'gemini' | 'browser';
+}
+
 interface UseWhisperASRReturn {
   finalText: string;
   isProcessing: boolean;
   error: string | null;
-  transcribe: (audioBlob: Blob) => Promise<string | null>;
+  transcribe: (audioBlob: Blob, options?: TranscribeOptions) => Promise<string | null>;
   reset: () => void;
   /** Which engine produced the final transcript (or is being tried) */
   engine: ASREngine | null;
