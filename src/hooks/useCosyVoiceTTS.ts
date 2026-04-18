@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 
 const PROMPT_AUDIO_KEY = 'resonance_prompt_audio';
 const PROMPT_TEXT_KEY = 'resonance_prompt_text';
+const TARGET_PROMPT_SAMPLE_RATE = 24000;
 
 interface UseCosyVoiceTTSReturn {
   speak: (text: string) => Promise<void>;
@@ -14,6 +15,84 @@ interface UseCosyVoiceTTSReturn {
   /** Whether a prompt audio is stored */
   hasPromptAudio: boolean;
   error: string | null;
+}
+
+function createAudioContext() {
+  try {
+    return new AudioContext({ sampleRate: TARGET_PROMPT_SAMPLE_RATE });
+  } catch {
+    return new AudioContext();
+  }
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') resolve(reader.result);
+      else reject(new Error('参考音频读取失败'));
+    };
+    reader.onerror = () => reject(new Error('参考音频读取失败'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function hasWavHeader(blob: Blob): Promise<boolean> {
+  if (blob.size < 12) return false;
+  const bytes = new Uint8Array(await blob.slice(0, 12).arrayBuffer());
+  const riff = String.fromCharCode(...bytes.slice(0, 4));
+  const wave = String.fromCharCode(...bytes.slice(8, 12));
+  return riff === 'RIFF' && wave === 'WAVE';
+}
+
+function encodeWav(audioBuffer: AudioBuffer): Blob {
+  const channelData = audioBuffer.getChannelData(0);
+  const numChannels = 1;
+  const sampleRate = audioBuffer.sampleRate;
+  const buffer = new ArrayBuffer(44 + channelData.length * 2);
+  const view = new DataView(buffer);
+
+  const writeString = (offset: number, value: string) => {
+    for (let i = 0; i < value.length; i++) {
+      view.setUint8(offset + i, value.charCodeAt(i));
+    }
+  };
+
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + channelData.length * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * numChannels * 2, true);
+  view.setUint16(32, numChannels * 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, channelData.length * 2, true);
+
+  for (let i = 0; i < channelData.length; i++) {
+    const sample = Math.max(-1, Math.min(1, channelData[i]));
+    view.setInt16(44 + i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+  }
+
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+async function normalizePromptAudio(blob: Blob): Promise<Blob> {
+  if (await hasWavHeader(blob)) {
+    return blob.type === 'audio/wav' ? blob : new Blob([await blob.arrayBuffer()], { type: 'audio/wav' });
+  }
+
+  const audioContext = createAudioContext();
+  try {
+    const source = await blob.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(source.slice(0));
+    return encodeWav(audioBuffer);
+  } finally {
+    await audioContext.close().catch(() => undefined);
+  }
 }
 
 export function useCosyVoiceTTS(): UseCosyVoiceTTSReturn {
@@ -29,30 +108,39 @@ export function useCosyVoiceTTS(): UseCosyVoiceTTSReturn {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const promptBlobRef = useRef<Blob | null>(null);
 
-  const setPromptAudio = useCallback((blob: Blob, promptText?: string) => {
-    promptBlobRef.current = blob;
-    // Also persist as base64 for cross-session usage
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      try {
-        localStorage.setItem(PROMPT_AUDIO_KEY, reader.result as string);
-        if (promptText) {
-          localStorage.setItem(PROMPT_TEXT_KEY, promptText);
-        }
-        setHasPromptAudio(true);
-      } catch { /* storage full */ }
-    };
-    reader.readAsDataURL(blob);
-  }, []);
-
   const clearPromptAudio = useCallback(() => {
     promptBlobRef.current = null;
     try {
       localStorage.removeItem(PROMPT_AUDIO_KEY);
       localStorage.removeItem(PROMPT_TEXT_KEY);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setHasPromptAudio(false);
   }, []);
+
+  const persistPromptAudio = useCallback(async (blob: Blob, promptText?: string) => {
+    const dataUrl = await blobToDataUrl(blob);
+    localStorage.setItem(PROMPT_AUDIO_KEY, dataUrl);
+    if (promptText) {
+      localStorage.setItem(PROMPT_TEXT_KEY, promptText);
+    }
+  }, []);
+
+  const setPromptAudio = useCallback((blob: Blob, promptText?: string) => {
+    void (async () => {
+      try {
+        const normalizedBlob = await normalizePromptAudio(blob);
+        await persistPromptAudio(normalizedBlob, promptText);
+        promptBlobRef.current = normalizedBlob;
+        setHasPromptAudio(true);
+        setError(null);
+      } catch {
+        clearPromptAudio();
+        setError('参考音频格式无效，请重新录制后再存为音色');
+      }
+    })();
+  }, [clearPromptAudio, persistPromptAudio]);
 
   /** Load prompt blob from localStorage if not in memory */
   const getPromptBlob = useCallback(async (): Promise<Blob | null> => {
@@ -79,20 +167,31 @@ export function useCosyVoiceTTS(): UseCosyVoiceTTSReturn {
     try {
       setIsSpeaking(true);
 
-      const promptBlob = await getPromptBlob();
+      const storedPromptBlob = await getPromptBlob();
       const promptText = localStorage.getItem(PROMPT_TEXT_KEY) || '';
 
       let response: Response;
 
       const apiBase = import.meta.env.VITE_WORKER_API_URL || '';
 
-      if (promptBlob) {
+      if (storedPromptBlob) {
+        let promptBlob: Blob;
+        try {
+          promptBlob = await normalizePromptAudio(storedPromptBlob);
+        } catch {
+          clearPromptAudio();
+          throw new Error('参考音频格式无效，请重新录制后再存为音色');
+        }
+
+        if (promptBlob !== storedPromptBlob || storedPromptBlob.type !== 'audio/wav') {
+          await persistPromptAudio(promptBlob, promptText || undefined);
+          promptBlobRef.current = promptBlob;
+        }
+
         const formData = new FormData();
-        const promptMime = promptBlob.type || 'audio/wav';
-        const promptExt = promptMime.includes('wav') ? 'wav' : promptMime.includes('webm') ? 'webm' : promptMime.includes('ogg') ? 'ogg' : 'bin';
         formData.append('tts_text', text);
         formData.append('prompt_text', promptText);
-        formData.append('prompt_wav', promptBlob, `prompt.${promptExt}`);
+        formData.append('prompt_wav', promptBlob, 'prompt.wav');
 
         response = await fetch(`${apiBase}/api/cosyvoice-tts`, {
           method: 'POST',
@@ -111,14 +210,12 @@ export function useCosyVoiceTTS(): UseCosyVoiceTTSReturn {
         throw new Error(errData.error || `TTS 请求失败 (${response.status})`);
       }
 
-      // Check for structured error in 200 response
       const responseContentType = response.headers.get('content-type') || '';
       if (responseContentType.includes('application/json')) {
         const errData = await response.json();
         if (errData.ok === false) {
           throw new Error(errData.error || 'TTS 服务暂时不可用');
         }
-        // Shouldn't reach here for valid audio, but just in case
         throw new Error(errData.error || '未知错误');
       }
 
@@ -142,7 +239,7 @@ export function useCosyVoiceTTS(): UseCosyVoiceTTSReturn {
       const message = err instanceof Error ? err.message : 'TTS 播放失败';
       setError(message);
     }
-  }, [getPromptBlob]);
+  }, [clearPromptAudio, getPromptBlob, persistPromptAudio]);
 
   const stop = useCallback(() => {
     if (audioRef.current) {
