@@ -7,7 +7,6 @@ import { useWechatBridge, getWechatDebugInfo } from '@/hooks/useWechatBridge';
 import AudioRecorderButton from '@/components/AudioRecorderButton';
 import ASRStreamingResult from '@/components/ASRStreamingResult';
 import ASREngineIndicator from '@/components/ASREngineIndicator';
-import ASREngineSelector from '@/components/ASREngineSelector';
 import { useASREnginePreference } from '@/hooks/useASREnginePreference';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAccessibility } from '@/hooks/useAccessibility';
@@ -236,20 +235,17 @@ export default function UsagePage({
         </motion.div>
       </div>
 
-      {/* Engine selector — visible whenever the user is about to record */}
+      {/* Engine selection moved to Settings page — keep recording UI minimal */}
       {flowState === 'idle' && (
         <motion.div
           initial={isMotionReduced ? {} : { opacity: 0 }}
           animate={isMotionReduced ? {} : { opacity: 1 }}
           transition={{ delay: 0.15 }}
-          className="space-y-2"
+          className="flex items-center justify-center gap-2 text-xs text-muted-foreground"
         >
-          <ASREngineSelector value={enginePref} onChange={setEnginePref} />
-          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-            <span>按</span>
-            <kbd className="kbd-hint">空格</kbd>
-            <span>开始录音</span>
-          </div>
+          <span>按</span>
+          <kbd className="kbd-hint">空格</kbd>
+          <span>开始录音</span>
         </motion.div>
       )}
 
