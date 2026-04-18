@@ -12,11 +12,23 @@ interface AudioRecorderButtonProps {
   size?: 'sm' | 'lg';
 }
 
-/** Detect if we're in a restricted WebView (WeChat) where framer-motion may break click events */
+/**
+ * Detect environments where framer-motion should be disabled:
+ * - WeChat WebView (breaks click events)
+ * - Any touch device / mobile UA (perf on low-end Android)
+ * - Users who prefer reduced motion at OS level
+ */
 function useIsRestrictedWebView() {
   if (typeof window === 'undefined') return false;
   if (window.__wxjs_environment === 'miniprogram') return true;
   if (/miniProgram|MicroMessenger/i.test(navigator.userAgent)) return true;
+  // Mobile UA — disable motion to avoid jank on low-end devices
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) return true;
+  // Touch-only devices
+  if (typeof window.matchMedia === 'function') {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true;
+    if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) return true;
+  }
   return false;
 }
 

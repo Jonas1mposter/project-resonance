@@ -20,11 +20,23 @@ const tabs = [
 ];
 
 
+/** True on mobile UA, touch-only devices, or prefers-reduced-motion */
+function detectMotionDisabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (/Android|iPhone|iPad|iPod|Mobile|miniProgram|MicroMessenger/i.test(navigator.userAgent)) return true;
+  if (typeof window.matchMedia === 'function') {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true;
+    if (window.matchMedia('(hover: none) and (pointer: coarse)').matches) return true;
+  }
+  return false;
+}
+
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { isOpen: shortcutsOpen, toggle: toggleShortcuts, close: closeShortcuts } = useShortcutHelpPanel();
-  const { isMotionReduced } = useAccessibility();
+  const { isMotionReduced: a11yReduced } = useAccessibility();
+  const isMotionReduced = a11yReduced || detectMotionDisabled();
   
 
   // Plain number key navigation (normal priority, page shortcuts override via capture phase)
