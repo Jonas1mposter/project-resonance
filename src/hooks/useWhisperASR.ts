@@ -1,12 +1,25 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 
+export type ASREngine = 'whisper' | 'gemini' | 'browser';
+export type ASREngineStage =
+  | 'idle'
+  | 'whisper-trying'
+  | 'gemini-trying'
+  | 'browser-trying'
+  | 'success'
+  | 'failed';
+
 interface UseWhisperASRReturn {
   finalText: string;
   isProcessing: boolean;
   error: string | null;
   transcribe: (audioBlob: Blob) => Promise<string | null>;
   reset: () => void;
+  /** Which engine produced the final transcript (or is being tried) */
+  engine: ASREngine | null;
+  /** Fine-grained stage for showing progress UI to the user */
+  engineStage: ASREngineStage;
 }
 
 /**
@@ -30,7 +43,6 @@ function browserSpeechFallback(): Promise<string | null> {
     recognition.continuous = false;
 
     let settled = false;
-
     const finish = (text: string | null) => {
       if (settled) return;
       settled = true;
@@ -41,14 +53,11 @@ function browserSpeechFallback(): Promise<string | null> {
       const transcript = event.results?.[0]?.[0]?.transcript?.trim() || '';
       finish(transcript || null);
     };
-
     recognition.onerror = () => finish(null);
     recognition.onnomatch = () => finish(null);
     recognition.onend = () => finish(null);
 
-    // Timeout safety
     setTimeout(() => finish(null), 8000);
-
     recognition.start();
   });
 }
@@ -66,7 +75,7 @@ async function geminiASRFallback(audioBlob: Blob): Promise<string | null> {
   const response = await fetch(`${supabaseUrl}/functions/v1/gemini-asr`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
     body: formData,
   });
@@ -82,45 +91,51 @@ export function useWhisperASR(): UseWhisperASRReturn {
   const [finalText, setFinalText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [engine, setEngine] = useState<ASREngine | null>(null);
+  const [engineStage, setEngineStage] = useState<ASREngineStage>('idle');
 
   const transcribe = useCallback(async (audioBlob: Blob): Promise<string | null> => {
     setError(null);
     setIsProcessing(true);
     setFinalText('');
+    setEngine(null);
+    setEngineStage('whisper-trying');
 
     /**
-     * Three-tier ASR fallback chain:
+     * Three-tier ASR fallback chain with full UI feedback:
      *   1. Worker → Whisper (self-hosted, primary)
      *   2. Gemini ASR edge function (cloud fallback)
      *   3. Browser Web Speech API (last-resort offline fallback)
-     *
-     * The Worker has its own internal Whisper→Gemini fallback, so the
-     * client-side Gemini step covers the case where the Worker itself is
-     * unreachable (404, network error, etc.).
      */
-    const tryGeminiThenBrowser = async (notify = true): Promise<string | null> => {
+    const tryGeminiThenBrowser = async (): Promise<string | null> => {
+      // Stage 2: Gemini
+      setEngineStage('gemini-trying');
       try {
         const geminiText = await geminiASRFallback(audioBlob);
         if (geminiText) {
+          setEngine('gemini');
+          setEngineStage('success');
           setFinalText(geminiText);
           setIsProcessing(false);
-          if (notify) toast.success('已通过 Gemini 云端识别');
           return geminiText;
         }
       } catch (geminiErr) {
         console.warn('[ASR] Gemini fallback failed:', geminiErr);
       }
 
+      // Stage 3: Browser native
+      setEngineStage('browser-trying');
       const browserText = await browserSpeechFallback();
       if (browserText) {
+        setEngine('browser');
+        setEngineStage('success');
         setFinalText(browserText);
         setIsProcessing(false);
-        if (notify) toast.success('已通过浏览器内置引擎识别（精度可能较低）');
         return browserText;
       }
 
-      const message = '所有语音识别服务均不可用，请稍后重试';
-      setError(message);
+      setEngineStage('failed');
+      setError('所有语音识别服务均不可用，请稍后重试');
       setIsProcessing(false);
       return null;
     };
@@ -135,10 +150,9 @@ export function useWhisperASR(): UseWhisperASRReturn {
         body: formData,
       });
 
-      // Hard failure (404, 5xx, etc.) — Worker itself is down
+      // Hard failure (404, 5xx) — Worker itself down
       if (!response.ok) {
         console.warn('[ASR] Worker returned', response.status, '→ fallback');
-        toast.info('主识别服务不可用，正在切换备用引擎...');
         return await tryGeminiThenBrowser();
       }
 
@@ -147,28 +161,27 @@ export function useWhisperASR(): UseWhisperASRReturn {
       // Soft failure — Worker reached but ASR engine returned error envelope
       if (data.ok === false) {
         console.warn('[ASR] Worker returned ok:false →', data.error);
-        toast.info('Whisper 离线，正在切换 Gemini 识别...');
         return await tryGeminiThenBrowser();
       }
 
       const text = (data.text || '').trim();
       if (text) {
+        // Worker may have already fallen back internally — respect its `source`
+        const reportedEngine: ASREngine =
+          data.source === 'gemini' ? 'gemini' : 'whisper';
+        setEngine(reportedEngine);
+        setEngineStage('success');
         setFinalText(text);
-        // Inform user when Worker already fell back to Gemini internally
-        if (data.source === 'gemini' || data.fallback) {
-          toast.info('已通过 Gemini 云端识别');
-        }
         setIsProcessing(false);
         return text;
       }
 
+      setEngineStage('failed');
       setError('未能识别到语音内容');
       setIsProcessing(false);
       return null;
     } catch (err) {
-      // Network error / fetch threw → Worker unreachable
       console.warn('[ASR] Worker fetch threw, falling back:', err);
-      toast.info('网络异常，正在切换备用识别引擎...');
       return await tryGeminiThenBrowser();
     }
   }, []);
@@ -177,7 +190,9 @@ export function useWhisperASR(): UseWhisperASRReturn {
     setFinalText('');
     setIsProcessing(false);
     setError(null);
+    setEngine(null);
+    setEngineStage('idle');
   }, []);
 
-  return { finalText, isProcessing, error, transcribe, reset };
+  return { finalText, isProcessing, error, transcribe, reset, engine, engineStage };
 }
