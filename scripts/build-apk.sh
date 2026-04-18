@@ -49,10 +49,10 @@ echo -e "${GREEN}✅ Node.js $(node -v)${NC}"
 if [ ! -f .env ]; then
   echo -e "${RED}❌ 错误: 项目根目录缺少 .env 文件${NC}"
   echo ""
-  echo "请创建 .env 并填入以下内容:"
-  echo "  VITE_SUPABASE_URL=https://lwusdbovydwbltxmpctr.supabase.co"
+  echo "请参考 .env.example 创建 .env，至少包含:"
+  echo "  VITE_SUPABASE_URL=https://<your-project-ref>.supabase.co"
   echo "  VITE_SUPABASE_PUBLISHABLE_KEY=<your_anon_key>"
-  echo "  VITE_SUPABASE_PROJECT_ID=lwusdbovydwbltxmpctr"
+  echo "  VITE_SUPABASE_PROJECT_ID=<your-project-ref>"
   exit 1
 fi
 
