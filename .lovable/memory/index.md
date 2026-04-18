@@ -6,6 +6,7 @@ Updated: just now
 ## Core
 - **Mission**: Accessibility-first product for users with dysarthria and elderly users. Every UX/perf/compat decision must serve this.
 - **Browser compat**: Must work on cheap/old domestic Chinese phones — old Android WebView, QQ/UC/百度/华为/小米 browsers, WeChat WebView. No bleeding-edge JS/CSS without polyfill or fallback. Test against ES2015 baseline (already enforced in vite.config.ts).
+- **All API calls via Worker**: Browser MUST only hit same-origin `/api/*` (Cloudflare Worker). Never call `*.supabase.co`, `googleapis.com`, etc. directly — China network blocks/flakes them. Add new Worker route for every external API.
 - Architecture: Cloudflare Worker proxy via VPC bindings (`http://127.0.0.1`), relative paths `/api/*`.
 - **Portability rule**: Cloudflare-first but NEVER hard-bind to Lovable — no `lovable.app` URLs, no Lovable SDKs, no project IDs in runtime code. Must run under `wrangler dev` standalone.
 - Agent Boundary: NEVER modify backend GPU/Python code (Whisper/CosyVoice). User handles deployment.
