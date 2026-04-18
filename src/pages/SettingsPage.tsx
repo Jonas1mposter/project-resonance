@@ -4,6 +4,7 @@ import { useTTS } from '@/hooks/useTTS';
 import AccessibilitySettings from '@/components/AccessibilitySettings';
 import AccessibleStepper from '@/components/AccessibleStepper';
 import ASRSettingsPanel from '@/components/ASRSettingsPanel';
+import DiagnosticsPanel from '@/components/DiagnosticsPanel';
 import { List, Mic, ChevronRight } from 'lucide-react';
 
 interface SettingsPageProps {
@@ -60,6 +61,9 @@ export default function SettingsPage({ settings, onUpdate }: SettingsPageProps) 
         settings={settings.asr}
         onUpdate={(asr: ASRSettings) => onUpdate({ ...settings, asr })}
       />
+
+      {/* Privacy + Diagnostics (corpus opt-out, log upload) */}
+      <DiagnosticsPanel />
 
       {/* Recognition Settings */}
       <div className="rounded-xl border border-border bg-card p-5 space-y-5">

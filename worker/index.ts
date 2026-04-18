@@ -6,6 +6,7 @@
 import { handleWhisperASR } from './whisper-asr';
 import { handleCosyVoiceTTS } from './cosyvoice-tts';
 import { handleCorpus } from './corpus';
+import { handleClientLogs } from './client-logs';
 
 export interface Env {
   WHISPER_VPC: Fetcher;
@@ -37,6 +38,9 @@ export default {
       }
       if (path === '/api/corpus') {
         return await handleCorpus(request);
+      }
+      if (path === '/api/client-logs') {
+        return await handleClientLogs(request);
       }
       // All other routes: serve static assets (SPA)
       return env.ASSETS.fetch(request);

@@ -8,15 +8,28 @@ import { useCallback } from 'react';
  * Storage: server-side disk (audio) + SQLite (metadata)
  *
  * Failures are swallowed — corpus collection must never disrupt the user flow.
+ *
+ * The user can opt out by setting localStorage['resonance_corpus_optout'] = '1'
+ * (managed in Settings page). When opted out, this hook becomes a no-op.
  */
 
-// Routed through Cloudflare Worker (`/api/corpus`) which proxies to the
-// Tencent Cloud VPS. Keeps the browser on a same-origin path and avoids
-// mixed-content / CORS issues.
 const CORPUS_API = `${import.meta.env.VITE_WORKER_API_URL || ''}/api/corpus`;
+export const CORPUS_OPTOUT_KEY = 'resonance_corpus_optout';
+
+export function isCorpusOptedOut(): boolean {
+  try {
+    return localStorage.getItem(CORPUS_OPTOUT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 export function useCorpusCollection() {
   const collect = useCallback(async (audioBlob: Blob, transcript: string, durationSec: number) => {
+    if (isCorpusOptedOut()) {
+      console.log('[Corpus] Skipped — user opted out');
+      return;
+    }
     try {
       const ts = Date.now();
       const ext = audioBlob.type.includes('webm')
