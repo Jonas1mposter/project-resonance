@@ -177,10 +177,15 @@ export function useCosyVoiceTTS(): UseCosyVoiceTTSReturn {
       if (storedPromptBlob) {
         let promptBlob: Blob;
         try {
+          // Force re-decode + re-encode every time to guarantee a clean RIFF/WAV
           promptBlob = await normalizePromptAudio(storedPromptBlob);
+          // Double check: must have RIFF/WAVE header now
+          if (!(await hasWavHeader(promptBlob))) {
+            throw new Error('encode failed');
+          }
         } catch {
           clearPromptAudio();
-          throw new Error('参考音频格式无效，请重新录制后再存为音色');
+          throw new Error('参考音频格式无效，请删除当前音色并重新录制');
         }
 
         if (promptBlob !== storedPromptBlob || storedPromptBlob.type !== 'audio/wav') {
