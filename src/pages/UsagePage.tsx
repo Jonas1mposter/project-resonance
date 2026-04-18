@@ -53,6 +53,7 @@ export default function UsagePage({
   } = useWhisperASR();
 
   const { collect: collectCorpus } = useCorpusCollection();
+  const { preference: enginePref, setPreference: setEnginePref } = useASREnginePreference();
 
   // Handle transcript received from WeChat native recording
   useEffect(() => {
@@ -96,7 +97,7 @@ export default function UsagePage({
     // Save real WAV only for voice prompt; never masquerade webm as wav
     lastWavBlobRef.current = wavBlob;
 
-    const text = await transcribe(webmBlob);
+    const text = await transcribe(webmBlob, { prefer: enginePref });
 
     if (text) {
       setLastTranscript(text);
@@ -106,7 +107,7 @@ export default function UsagePage({
 
     // Go straight to result — no auto-speak
     setFlowState('result');
-  }, [stopRecording, transcribe, collectCorpus]);
+  }, [stopRecording, transcribe, collectCorpus, enginePref]);
 
   const handleSaveVoice = useCallback(() => {
     const wav = lastWavBlobRef.current;
