@@ -10,11 +10,16 @@ export type ASREngineStage =
   | 'success'
   | 'failed';
 
+interface TranscribeOptions {
+  /** Force a specific engine. When set, no fallback is performed. */
+  prefer?: 'auto' | 'whisper' | 'gemini' | 'browser';
+}
+
 interface UseWhisperASRReturn {
   finalText: string;
   isProcessing: boolean;
   error: string | null;
-  transcribe: (audioBlob: Blob) => Promise<string | null>;
+  transcribe: (audioBlob: Blob, options?: TranscribeOptions) => Promise<string | null>;
   reset: () => void;
   /** Which engine produced the final transcript (or is being tried) */
   engine: ASREngine | null;
@@ -94,21 +99,95 @@ export function useWhisperASR(): UseWhisperASRReturn {
   const [engine, setEngine] = useState<ASREngine | null>(null);
   const [engineStage, setEngineStage] = useState<ASREngineStage>('idle');
 
-  const transcribe = useCallback(async (audioBlob: Blob): Promise<string | null> => {
+  const transcribe = useCallback(async (audioBlob: Blob, options?: TranscribeOptions): Promise<string | null> => {
+    const prefer = options?.prefer ?? 'auto';
+
     setError(null);
     setIsProcessing(true);
     setFinalText('');
     setEngine(null);
+
+    /** Helper: call Whisper via Worker. Throws on hard failure. */
+    const callWhisper = async (): Promise<{ text: string; source: ASREngine } | null> => {
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'recording.webm');
+      const apiBase = import.meta.env.VITE_WORKER_API_URL || '';
+      const response = await fetch(`${apiBase}/api/whisper-asr`, { method: 'POST', body: formData });
+      if (!response.ok) throw new Error(`Worker ${response.status}`);
+      const data = await response.json().catch(() => ({} as any));
+      if (data.ok === false) throw new Error(data.error || 'Whisper failed');
+      const text = (data.text || '').trim();
+      if (!text) return null;
+      // Worker may have internally fallen back to Gemini; respect its source
+      const source: ASREngine = data.source === 'gemini' ? 'gemini' : 'whisper';
+      return { text, source };
+    };
+
+    // === Forced single-engine modes (no fallback) ===
+    if (prefer === 'whisper') {
+      setEngineStage('whisper-trying');
+      try {
+        const result = await callWhisper();
+        if (result?.text) {
+          setEngine(result.source);
+          setEngineStage('success');
+          setFinalText(result.text);
+          setIsProcessing(false);
+          return result.text;
+        }
+        setEngineStage('failed');
+        setError('Whisper 未能识别到语音内容');
+      } catch (err) {
+        console.warn('[ASR] Whisper-only failed:', err);
+        setEngineStage('failed');
+        setError('Whisper 服务不可用，请切换其他引擎或选 auto');
+      }
+      setIsProcessing(false);
+      return null;
+    }
+
+    if (prefer === 'gemini') {
+      setEngineStage('gemini-trying');
+      try {
+        const text = await geminiASRFallback(audioBlob);
+        if (text) {
+          setEngine('gemini');
+          setEngineStage('success');
+          setFinalText(text);
+          setIsProcessing(false);
+          return text;
+        }
+        setEngineStage('failed');
+        setError('Gemini 未能识别到语音内容');
+      } catch (err) {
+        console.warn('[ASR] Gemini-only failed:', err);
+        setEngineStage('failed');
+        setError('Gemini 服务不可用，请切换其他引擎');
+      }
+      setIsProcessing(false);
+      return null;
+    }
+
+    if (prefer === 'browser') {
+      setEngineStage('browser-trying');
+      const text = await browserSpeechFallback();
+      if (text) {
+        setEngine('browser');
+        setEngineStage('success');
+        setFinalText(text);
+        setIsProcessing(false);
+        return text;
+      }
+      setEngineStage('failed');
+      setError('浏览器内置识别不可用或没听清（仅 Chrome/Edge 桌面版支持）');
+      setIsProcessing(false);
+      return null;
+    }
+
+    // === Auto mode: full Whisper → Gemini → Browser fallback chain ===
     setEngineStage('whisper-trying');
 
-    /**
-     * Three-tier ASR fallback chain with full UI feedback:
-     *   1. Worker → Whisper (self-hosted, primary)
-     *   2. Gemini ASR edge function (cloud fallback)
-     *   3. Browser Web Speech API (last-resort offline fallback)
-     */
     const tryGeminiThenBrowser = async (): Promise<string | null> => {
-      // Stage 2: Gemini
       setEngineStage('gemini-trying');
       try {
         const geminiText = await geminiASRFallback(audioBlob);
@@ -123,7 +202,6 @@ export function useWhisperASR(): UseWhisperASRReturn {
         console.warn('[ASR] Gemini fallback failed:', geminiErr);
       }
 
-      // Stage 3: Browser native
       setEngineStage('browser-trying');
       const browserText = await browserSpeechFallback();
       if (browserText) {
@@ -141,47 +219,20 @@ export function useWhisperASR(): UseWhisperASRReturn {
     };
 
     try {
-      const formData = new FormData();
-      formData.append('file', audioBlob, 'recording.webm');
-
-      const apiBase = import.meta.env.VITE_WORKER_API_URL || '';
-      const response = await fetch(`${apiBase}/api/whisper-asr`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      // Hard failure (404, 5xx) — Worker itself down
-      if (!response.ok) {
-        console.warn('[ASR] Worker returned', response.status, '→ fallback');
-        return await tryGeminiThenBrowser();
-      }
-
-      const data = await response.json().catch(() => ({} as any));
-
-      // Soft failure — Worker reached but ASR engine returned error envelope
-      if (data.ok === false) {
-        console.warn('[ASR] Worker returned ok:false →', data.error);
-        return await tryGeminiThenBrowser();
-      }
-
-      const text = (data.text || '').trim();
-      if (text) {
-        // Worker may have already fallen back internally — respect its `source`
-        const reportedEngine: ASREngine =
-          data.source === 'gemini' ? 'gemini' : 'whisper';
-        setEngine(reportedEngine);
+      const result = await callWhisper();
+      if (result?.text) {
+        setEngine(result.source);
         setEngineStage('success');
-        setFinalText(text);
+        setFinalText(result.text);
         setIsProcessing(false);
-        return text;
+        return result.text;
       }
-
       setEngineStage('failed');
       setError('未能识别到语音内容');
       setIsProcessing(false);
       return null;
     } catch (err) {
-      console.warn('[ASR] Worker fetch threw, falling back:', err);
+      console.warn('[ASR] Worker call failed in auto mode, falling back:', err);
       return await tryGeminiThenBrowser();
     }
   }, []);

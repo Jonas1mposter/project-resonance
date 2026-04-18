@@ -7,6 +7,8 @@ import { useWechatBridge, getWechatDebugInfo } from '@/hooks/useWechatBridge';
 import AudioRecorderButton from '@/components/AudioRecorderButton';
 import ASRStreamingResult from '@/components/ASRStreamingResult';
 import ASREngineIndicator from '@/components/ASREngineIndicator';
+import ASREngineSelector from '@/components/ASREngineSelector';
+import { useASREnginePreference } from '@/hooks/useASREnginePreference';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAccessibility } from '@/hooks/useAccessibility';
 import { useCorpusCollection } from '@/hooks/useCorpusCollection';
@@ -51,6 +53,7 @@ export default function UsagePage({
   } = useWhisperASR();
 
   const { collect: collectCorpus } = useCorpusCollection();
+  const { preference: enginePref, setPreference: setEnginePref } = useASREnginePreference();
 
   // Handle transcript received from WeChat native recording
   useEffect(() => {
@@ -94,7 +97,7 @@ export default function UsagePage({
     // Save real WAV only for voice prompt; never masquerade webm as wav
     lastWavBlobRef.current = wavBlob;
 
-    const text = await transcribe(webmBlob);
+    const text = await transcribe(webmBlob, { prefer: enginePref });
 
     if (text) {
       setLastTranscript(text);
@@ -104,7 +107,7 @@ export default function UsagePage({
 
     // Go straight to result — no auto-speak
     setFlowState('result');
-  }, [stopRecording, transcribe, collectCorpus]);
+  }, [stopRecording, transcribe, collectCorpus, enginePref]);
 
   const handleSaveVoice = useCallback(() => {
     const wav = lastWavBlobRef.current;
@@ -233,17 +236,20 @@ export default function UsagePage({
         </motion.div>
       </div>
 
-      {/* Keyboard hint */}
+      {/* Engine selector — visible whenever the user is about to record */}
       {flowState === 'idle' && (
         <motion.div
           initial={isMotionReduced ? {} : { opacity: 0 }}
           animate={isMotionReduced ? {} : { opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="flex items-center justify-center gap-2 text-xs text-muted-foreground"
+          transition={{ delay: 0.15 }}
+          className="space-y-2"
         >
-          <span>按</span>
-          <kbd className="kbd-hint">空格</kbd>
-          <span>开始录音</span>
+          <ASREngineSelector value={enginePref} onChange={setEnginePref} />
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <span>按</span>
+            <kbd className="kbd-hint">空格</kbd>
+            <span>开始录音</span>
+          </div>
         </motion.div>
       )}
 
