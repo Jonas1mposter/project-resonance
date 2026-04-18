@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Settings, Zap, ShieldCheck, Loader2 } from 'lucide-react';
 import { ASRSettings, DEFAULT_ASR_SETTINGS } from '@/types';
+import ASREngineSelector from '@/components/ASREngineSelector';
+import { useASREnginePreference } from '@/hooks/useASREnginePreference';
 
 interface ASRSettingsPanelProps {
   settings: ASRSettings;
@@ -11,6 +13,7 @@ type ServiceStatus = 'checking' | 'online' | 'offline';
 
 export default function ASRSettingsPanel({ settings, onUpdate }: ASRSettingsPanelProps) {
   const [status, setStatus] = useState<ServiceStatus>('checking');
+  const { preference: enginePref, setPreference: setEnginePref } = useASREnginePreference();
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +62,18 @@ export default function ASRSettingsPanel({ settings, onUpdate }: ASRSettingsPane
         <ShieldCheck className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
         <p className="text-xs text-muted-foreground">
           ASR 将使用本地部署的 Whisper 模型，通过后端函数代理转发请求
+        </p>
+      </div>
+
+      {/* Engine preference */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-foreground">识别引擎</span>
+          <span className="text-[11px] text-muted-foreground">智能模式自动回退</span>
+        </div>
+        <ASREngineSelector value={enginePref} onChange={setEnginePref} className="w-full" />
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          智能：Whisper → Gemini → 浏览器顺序自动回退；其余强制只用对应引擎，便于排查。
         </p>
       </div>
 
