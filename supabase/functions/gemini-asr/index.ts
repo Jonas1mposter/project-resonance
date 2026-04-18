@@ -1,9 +1,11 @@
 /**
- * Gemini ASR Edge Function
+ * Gemini ASR Edge Function — Direct Google AI Studio integration.
  *
- * Uses Lovable AI Gateway (Gemini) for speech-to-text as a fallback
- * when self-hosted Whisper is unavailable.
- * Accepts audio via multipart/form-data, sends to Gemini with audio understanding.
+ * Portability: NO Lovable AI Gateway dependency. Calls Google's official
+ * generativelanguage.googleapis.com endpoint directly. Runs unchanged on
+ * any Deno-compatible host (Supabase, Deno Deploy, self-hosted).
+ *
+ * Required env: GEMINI_API_KEY (get from https://aistudio.google.com/apikey)
  */
 
 const corsHeaders = {
@@ -14,8 +16,38 @@ const corsHeaders = {
 
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
-const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-2.5-flash";
+const MODEL = "gemini-2.5-flash";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+
+const PROMPT =
+  "请转录以下音频中的语音内容。只输出转录的文字，不要加任何说明、标点符号修正或额外内容。如果听不清或没有语音，输出空字符串。音频可能是中文普通话，说话者可能有构音障碍（dysarthria），请尽力识别。";
+
+function pickMime(raw: string): string {
+  const m = (raw || "").toLowerCase();
+  if (m.includes("wav")) return "audio/wav";
+  if (m.includes("mp3") || m.includes("mpeg")) return "audio/mp3";
+  if (m.includes("ogg")) return "audio/ogg";
+  if (m.includes("flac")) return "audio/flac";
+  if (m.includes("aac")) return "audio/aac";
+  if (m.includes("m4a") || m.includes("mp4")) return "audio/mp4";
+  // Gemini doesn't accept webm/opus directly; send as ogg which usually works for opus-in-ogg.
+  if (m.includes("webm") || m.includes("opus")) return "audio/ogg";
+  return "audio/wav";
+}
+
+// Chunked base64 encode to avoid stack overflow on large buffers.
+function toBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(
+      null,
+      Array.from(bytes.subarray(i, i + chunk)),
+    );
+  }
+  return btoa(binary);
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -23,24 +55,28 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
+    return new Response(JSON.stringify({ ok: false, error: "Method not allowed" }), {
+      status: 200,
       headers: jsonHeaders,
     });
   }
 
-  const apiKey = Deno.env.get("LOVABLE_API_KEY");
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ ok: false, error: "LOVABLE_API_KEY 未配置" }),
-      { status: 200, headers: jsonHeaders }
+      JSON.stringify({
+        ok: false,
+        error:
+          "GEMINI_API_KEY 未配置。请在后端密钥管理中添加 GEMINI_API_KEY（从 https://aistudio.google.com/apikey 获取）",
+      }),
+      { status: 200, headers: jsonHeaders },
     );
   }
 
   try {
     const contentType = req.headers.get("content-type") || "";
     let audioBytes: ArrayBuffer;
-    let mimeType = "audio/webm";
+    let rawMime = "audio/webm";
 
     if (contentType.includes("multipart/form-data")) {
       const form = await req.formData();
@@ -48,11 +84,11 @@ Deno.serve(async (req) => {
       if (!file || !(file instanceof File)) {
         return new Response(
           JSON.stringify({ ok: false, error: "缺少音频文件" }),
-          { status: 200, headers: jsonHeaders }
+          { status: 200, headers: jsonHeaders },
         );
       }
       audioBytes = await file.arrayBuffer();
-      mimeType = file.type || "audio/webm";
+      rawMime = file.type || "audio/webm";
     } else {
       audioBytes = await req.arrayBuffer();
     }
@@ -60,44 +96,30 @@ Deno.serve(async (req) => {
     if (audioBytes.byteLength === 0) {
       return new Response(
         JSON.stringify({ ok: false, error: "音频为空" }),
-        { status: 200, headers: jsonHeaders }
+        { status: 200, headers: jsonHeaders },
       );
     }
 
-    // Convert to base64 for Gemini multimodal input
-    const base64Audio = btoa(
-      String.fromCharCode(...new Uint8Array(audioBytes))
-    );
+    const mimeType = pickMime(rawMime);
+    const base64Audio = toBase64(audioBytes);
 
-    // Call Gemini via Lovable AI Gateway with audio input
-    const response = await fetch(AI_GATEWAY_URL, {
+    const response = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: MODEL,
-        messages: [
+        contents: [
           {
             role: "user",
-            content: [
-              {
-                type: "text",
-                text: "请转录以下音频中的语音内容。只输出转录的文字，不要加任何说明、标点符号修正或额外内容。如果听不清或没有语音，输出空字符串。音频可能是中文普通话，说话者可能有构音障碍（dysarthria），请尽力识别。",
-              },
-              {
-                type: "input_audio",
-                input_audio: {
-                  data: base64Audio,
-                  format: mimeType.includes("wav") ? "wav" : mimeType.includes("mp3") ? "mp3" : "webm",
-                },
-              },
+            parts: [
+              { text: PROMPT },
+              { inline_data: { mime_type: mimeType, data: base64Audio } },
             ],
           },
         ],
-        max_tokens: 500,
-        temperature: 0,
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 500,
+        },
       }),
     });
 
@@ -110,16 +132,20 @@ Deno.serve(async (req) => {
           error: `Gemini ASR 请求失败 (${response.status})`,
           detail: errText.slice(0, 200),
         }),
-        { status: 200, headers: jsonHeaders }
+        { status: 200, headers: jsonHeaders },
       );
     }
 
     const result = await response.json();
-    const text = result.choices?.[0]?.message?.content?.trim() || "";
+    const text =
+      result?.candidates?.[0]?.content?.parts
+        ?.map((p: { text?: string }) => p.text || "")
+        .join("")
+        .trim() || "";
 
     return new Response(
       JSON.stringify({ ok: true, text, source: "gemini" }),
-      { status: 200, headers: jsonHeaders }
+      { status: 200, headers: jsonHeaders },
     );
   } catch (err) {
     console.error("[gemini-asr] Error:", err);
@@ -129,7 +155,7 @@ Deno.serve(async (req) => {
         error: "Gemini ASR 处理失败",
         detail: String(err),
       }),
-      { status: 200, headers: jsonHeaders }
+      { status: 200, headers: jsonHeaders },
     );
   }
 });

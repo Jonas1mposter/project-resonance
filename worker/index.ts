@@ -12,6 +12,10 @@ export interface Env {
   WHISPER_VPC: Fetcher;
   COSYVOICE_VPC: Fetcher;
   ASSETS: Fetcher;
+  /** Optional: full URL to a gemini-asr edge function for ASR fallback */
+  GEMINI_ASR_URL?: string;
+  /** Optional: bearer/apikey token for the GEMINI_ASR_URL endpoint */
+  GEMINI_ASR_KEY?: string;
 }
 
 const corsHeaders: Record<string, string> = {
