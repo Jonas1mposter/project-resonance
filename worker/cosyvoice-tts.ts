@@ -1,5 +1,7 @@
 /**
- * CosyVoice TTS handler — Gradio API adapter via VPC binding.
+ * CosyVoice TTS handler — FastAPI adapter via VPC binding.
+ * Backend: server.py (FastAPI) exposing /inference_zero_shot etc.
+ * Returns raw int16 PCM stream @ 24kHz mono → we wrap as WAV for the browser.
  */
 
 import type { Env } from './index';
@@ -10,129 +12,40 @@ const corsHeaders = {
 };
 const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' };
 
-function errorResponse(error: string, fallback = false) {
-  return new Response(JSON.stringify({ ok: false, error, fallback }), { status: 200, headers: jsonHeaders });
+function errorResponse(error: string, fallback = false, status = 200) {
+  return new Response(JSON.stringify({ ok: false, error, fallback }), { status, headers: jsonHeaders });
 }
 
 const INTERNAL = 'http://127.0.0.1';
+const SAMPLE_RATE = 24000; // CosyVoice3 output sample rate
+const NUM_CHANNELS = 1;
+const BITS_PER_SAMPLE = 16;
 
-async function uploadToGradio(vpc: Fetcher, file: File): Promise<Record<string, unknown>> {
-  const form = new FormData();
-  form.append('files', file, file.name || 'prompt.wav');
+/** Build a 44-byte RIFF/WAV header for int16 PCM data of given byte length */
+function buildWavHeader(pcmByteLength: number): Uint8Array {
+  const header = new ArrayBuffer(44);
+  const view = new DataView(header);
+  const byteRate = SAMPLE_RATE * NUM_CHANNELS * (BITS_PER_SAMPLE / 8);
+  const blockAlign = NUM_CHANNELS * (BITS_PER_SAMPLE / 8);
 
-  const res = await vpc.fetch(`${INTERNAL}/gradio_api/upload`, { method: 'POST', body: form });
-  if (!res.ok) throw new Error(`Gradio upload failed: ${res.status} ${await res.text()}`);
-
-  const paths: string[] = await res.json();
-  return { path: paths[0], meta: { _type: 'gradio.FileData' } };
-}
-
-async function pollGradioResult(vpc: Fetcher, eventId: string): Promise<string | null> {
-  const res = await vpc.fetch(`${INTERNAL}/gradio_api/call/generate_audio/${eventId}`);
-  if (!res.ok) { console.error('[cosyvoice-tts] SSE fetch failed:', res.status); return null; }
-
-  const text = await res.text();
-  console.log('[cosyvoice-tts] SSE response:', text.substring(0, 1000));
-
-  const lines = text.split('\n');
-  let completeWav: string | null = null;
-  let completeAny: string | null = null;
-  let generatingWav: string | null = null;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.startsWith('data: ') && i > 0) {
-      const eventLine = lines[i - 1];
-      try {
-        const data = JSON.parse(line.substring(6));
-        const item = Array.isArray(data) ? data[0] : null;
-        let url: string | null = null;
-        if (item?.url && typeof item.url === 'string') url = item.url;
-        else if (item?.path && typeof item.path === 'string') url = `${INTERNAL}/gradio_api/file=${item.path}`;
-        if (!url) continue;
-        const isM3u8 = url.includes('.m3u8');
-        if (eventLine.includes('complete')) {
-          completeAny = url;
-          if (!isM3u8) completeWav = url;
-        } else if (eventLine.includes('generating') && !isM3u8) {
-          generatingWav = url;
-        }
-      } catch { /* continue */ }
-    }
-  }
-  // Prefer non-m3u8 (direct wav) URLs; fall back to any complete URL only if no wav available
-  return completeWav || generatingWav || completeAny || null;
-}
-
-async function fetchAudio(vpc: Fetcher, audioUrl: string | null | undefined): Promise<Uint8Array | null> {
-  if (!audioUrl || typeof audioUrl !== 'string') {
-    console.error('[cosyvoice-tts] fetchAudio called with invalid url:', audioUrl);
-    return null;
-  }
-  if (audioUrl.includes('playlist.m3u8')) return fetchHLSAudio(vpc, audioUrl);
-  const internal = toInternal(audioUrl);
-  const res = await vpc.fetch(internal);
-  if (!res.ok) {
-    console.error('[cosyvoice-tts] audio fetch failed:', res.status, internal);
-    return null;
-  }
-  return new Uint8Array(await res.arrayBuffer());
-}
-
-/** Rewrite a public Gradio URL to the internal VPC host so requests go through the binding */
-function toInternal(url: string): string {
-  try {
-    const u = new URL(url);
-    return `${INTERNAL}${u.pathname}${u.search}`;
-  } catch {
-    return url;
-  }
-}
-
-async function fetchHLSAudio(vpc: Fetcher, playlistUrl: string): Promise<Uint8Array | null> {
-  const internalPlaylist = toInternal(playlistUrl);
-  for (let attempt = 0; attempt < 8; attempt++) {
-    const res = await vpc.fetch(internalPlaylist);
-    if (!res.ok) { console.error('[cosyvoice-tts] m3u8 fetch failed:', res.status); return null; }
-
-    const m3u8 = await res.text();
-    const ended = m3u8.includes('#EXT-X-ENDLIST');
-    const baseUrl = internalPlaylist.substring(0, internalPlaylist.lastIndexOf('/') + 1);
-    const segments: string[] = [];
-    for (const line of m3u8.split('\n')) {
-      const t = line.trim();
-      if (t && !t.startsWith('#')) segments.push(t);
-    }
-    console.log('[cosyvoice-tts] m3u8 attempt', attempt + 1, 'segments:', segments.length, 'ended:', ended);
-
-    if (segments.length === 0) {
-      if (ended) return null; // ended with no segments → real failure
-      await new Promise(r => setTimeout(r, 1500));
-      continue;
-    }
-
-    const chunks: Uint8Array[] = [];
-    for (const seg of segments) {
-      const segUrl = seg.startsWith('http') ? toInternal(seg) : `${baseUrl}${seg}`;
-      const segRes = await vpc.fetch(segUrl);
-      if (segRes.ok) chunks.push(new Uint8Array(await segRes.arrayBuffer()));
-    }
-
-    const totalLen = chunks.reduce((s, c) => s + c.length, 0);
-    // If playlist hasn't ended and we have very little audio, wait for more segments
-    if (!ended && totalLen < 2000) {
-      await new Promise(r => setTimeout(r, 1500));
-      continue;
-    }
-
-    if (totalLen === 0) return null;
-
-    const result = new Uint8Array(totalLen);
-    let offset = 0;
-    for (const c of chunks) { result.set(c, offset); offset += c.length; }
-    return result;
-  }
-  return null;
+  // "RIFF"
+  view.setUint8(0, 0x52); view.setUint8(1, 0x49); view.setUint8(2, 0x46); view.setUint8(3, 0x46);
+  view.setUint32(4, 36 + pcmByteLength, true);
+  // "WAVE"
+  view.setUint8(8, 0x57); view.setUint8(9, 0x41); view.setUint8(10, 0x56); view.setUint8(11, 0x45);
+  // "fmt "
+  view.setUint8(12, 0x66); view.setUint8(13, 0x6d); view.setUint8(14, 0x74); view.setUint8(15, 0x20);
+  view.setUint32(16, 16, true);            // PCM chunk size
+  view.setUint16(20, 1, true);             // PCM format
+  view.setUint16(22, NUM_CHANNELS, true);
+  view.setUint32(24, SAMPLE_RATE, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, BITS_PER_SAMPLE, true);
+  // "data"
+  view.setUint8(36, 0x64); view.setUint8(37, 0x61); view.setUint8(38, 0x74); view.setUint8(39, 0x61);
+  view.setUint32(40, pcmByteLength, true);
+  return new Uint8Array(header);
 }
 
 export async function handleCosyVoiceTTS(request: Request, env: Env): Promise<Response> {
@@ -148,46 +61,65 @@ export async function handleCosyVoiceTTS(request: Request, env: Env): Promise<Re
 
   try {
     const contentType = request.headers.get('content-type') || '';
-    let ttsText: string;
-    let promptText = '';
-    let promptFileRef: Record<string, unknown> | null = null;
-    const mode = '3s极速复刻';
 
-    if (contentType.includes('multipart/form-data')) {
-      const formData = await request.formData();
-      ttsText = formData.get('tts_text') as string;
-      promptText = (formData.get('prompt_text') as string) || '';
-      const promptWav = formData.get('prompt_wav') as File | null;
-      if (!ttsText) return errorResponse("Missing 'tts_text'");
-      if (promptWav) promptFileRef = await uploadToGradio(vpc, promptWav);
-    } else {
-      const body = await request.json() as any;
-      ttsText = body.text;
-      if (!ttsText) return errorResponse("Missing 'text'");
-      return errorResponse('请先「存为音色」后再朗读，当前服务需要参考音频', true);
+    // Health check (JSON without prompt → not supported in zero-shot-only flow)
+    if (!contentType.includes('multipart/form-data')) {
+      const body = await request.json().catch(() => ({})) as any;
+      if (body?.text) {
+        return errorResponse('请先「存为音色」后再朗读，当前服务需要参考音频', true);
+      }
+      // health ping
+      const ping = await vpc.fetch(`${INTERNAL}/health`).catch(() => null);
+      if (ping?.ok) {
+        return new Response(JSON.stringify({ ok: true, status: 'healthy' }), { status: 200, headers: jsonHeaders });
+      }
+      return errorResponse('TTS 服务不可达', true);
     }
 
-    const gradioData = [ttsText, mode, '', promptText, promptFileRef, null, '', 0, false, 1.0];
+    const formData = await request.formData();
+    const ttsText = formData.get('tts_text') as string;
+    const promptText = (formData.get('prompt_text') as string) || '';
+    const promptWav = formData.get('prompt_wav') as File | null;
 
-    const submitRes = await vpc.fetch(`${INTERNAL}/gradio_api/call/generate_audio`, {
+    if (!ttsText) return errorResponse("Missing 'tts_text'");
+    if (!promptWav) return errorResponse('缺少参考音频 prompt_wav', true);
+
+    // Forward to FastAPI /inference_zero_shot
+    const upstreamForm = new FormData();
+    upstreamForm.append('tts_text', ttsText);
+    upstreamForm.append('prompt_text', promptText);
+    upstreamForm.append('prompt_wav', promptWav, promptWav.name || 'prompt.wav');
+
+    const upstream = await vpc.fetch(`${INTERNAL}/inference_zero_shot`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: gradioData }),
+      body: upstreamForm,
     });
 
-    if (!submitRes.ok) return errorResponse('语音合成任务提交失败', true);
-    const { event_id } = await submitRes.json() as any;
+    if (!upstream.ok) {
+      const errText = await upstream.text().catch(() => '');
+      console.error('[cosyvoice-tts] upstream failed:', upstream.status, errText.substring(0, 500));
+      return errorResponse(`语音合成失败 (${upstream.status})`, true);
+    }
 
-    const audioUrl = await pollGradioResult(vpc, event_id);
-    if (!audioUrl) return errorResponse('语音合成失败，模型未返回音频', true);
+    // Buffer raw PCM stream, then prepend WAV header.
+    // (Workers can't easily mutate header length mid-stream, so we buffer.)
+    const pcmBuf = new Uint8Array(await upstream.arrayBuffer());
+    if (pcmBuf.length === 0) {
+      return errorResponse('语音合成完成但音频为空', true);
+    }
 
-    const audioData = await fetchAudio(vpc, audioUrl);
-    if (!audioData || audioData.length === 0) return errorResponse('语音合成完成但音频下载失败，请重试', true);
+    const header = buildWavHeader(pcmBuf.length);
+    const wav = new Uint8Array(header.length + pcmBuf.length);
+    wav.set(header, 0);
+    wav.set(pcmBuf, header.length);
 
-    const isHLS = audioUrl.includes('playlist.m3u8');
-    return new Response(audioData, {
+    return new Response(wav, {
       status: 200,
-      headers: { ...corsHeaders, 'Content-Type': isHLS ? 'audio/aac' : 'audio/wav', 'Cache-Control': 'no-cache' },
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'audio/wav',
+        'Cache-Control': 'no-cache',
+      },
     });
   } catch (err) {
     console.error('[cosyvoice-tts] Error:', err);
