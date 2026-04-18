@@ -7,6 +7,8 @@ import { useWechatBridge, getWechatDebugInfo } from '@/hooks/useWechatBridge';
 import AudioRecorderButton from '@/components/AudioRecorderButton';
 import ASRStreamingResult from '@/components/ASRStreamingResult';
 import ASREngineIndicator from '@/components/ASREngineIndicator';
+import ASREngineSelector from '@/components/ASREngineSelector';
+import { useASREnginePreference } from '@/hooks/useASREnginePreference';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAccessibility } from '@/hooks/useAccessibility';
 import { useCorpusCollection } from '@/hooks/useCorpusCollection';
