@@ -5,8 +5,6 @@ import AccessibilitySettings from '@/components/AccessibilitySettings';
 import AccessibleStepper from '@/components/AccessibleStepper';
 import ASRSettingsPanel from '@/components/ASRSettingsPanel';
 import DiagnosticsPanel from '@/components/DiagnosticsPanel';
-import ASREngineSelector from '@/components/ASREngineSelector';
-import { useASREnginePreference } from '@/hooks/useASREnginePreference';
 import { List, Mic, ChevronRight } from 'lucide-react';
 
 interface SettingsPageProps {
@@ -17,7 +15,6 @@ interface SettingsPageProps {
 export default function SettingsPage({ settings, onUpdate }: SettingsPageProps) {
   const { voices, hasChineseVoice } = useTTS();
   const navigate = useNavigate();
-  const { preference: enginePref, setPreference: setEnginePref } = useASREnginePreference();
 
   const update = (key: keyof AppSettings, value: number | string) => {
     onUpdate({ ...settings, [key]: value });
@@ -59,18 +56,7 @@ export default function SettingsPage({ settings, onUpdate }: SettingsPageProps) 
       {/* Accessibility Settings */}
       <AccessibilitySettings />
 
-      {/* ASR Engine selection (moved here from recording page) */}
-      <div className="rounded-xl border border-border bg-card p-5 space-y-3">
-        <div>
-          <h3 className="font-semibold text-foreground">语音识别引擎</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            智能模式按 Whisper → Gemini → 浏览器顺序自动回退；其余选项强制只用对应引擎，便于排查。
-          </p>
-        </div>
-        <ASREngineSelector value={enginePref} onChange={setEnginePref} />
-      </div>
-
-      {/* ASR Settings */}
+      {/* ASR Settings (engine selector lives inside this panel) */}
       <ASRSettingsPanel
         settings={settings.asr}
         onUpdate={(asr: ASRSettings) => onUpdate({ ...settings, asr })}
