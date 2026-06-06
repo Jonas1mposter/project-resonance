@@ -1,7 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { useAppData } from '@/hooks/useAppData';
 import { useTTS } from '@/hooks/useTTS';
-import { useCosyVoiceTTS } from '@/hooks/useCosyVoiceTTS';
+import { useStepfunTTS } from '@/hooks/useStepfunTTS';
 import { useMemo, useState, useEffect, lazy, Suspense } from 'react';
 
 const UsagePage = lazy(() => import('./pages/UsagePage'));
@@ -63,7 +63,7 @@ export default function AppRoutes() {
     clearPromptAudio,
     hasPromptAudio,
     error: ttsError,
-  } = useCosyVoiceTTS();
+  } = useStepfunTTS();
 
   const trainedCount = useMemo(
     () => phrases.filter((p) => p.enabled && p.recordingCount >= 2).length,
