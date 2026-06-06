@@ -5,6 +5,7 @@
 
 import { handleWhisperASR } from './whisper-asr';
 import { handleCosyVoiceTTS } from './cosyvoice-tts';
+import { handleStepfunTTS } from './stepfun-tts';
 import { handleGeminiASR } from './gemini-asr';
 import { handleCorpus } from './corpus';
 import { handleClientLogs } from './client-logs';
@@ -17,6 +18,8 @@ export interface Env {
   GEMINI_ASR_URL?: string;
   /** Optional: bearer/apikey token for the GEMINI_ASR_URL endpoint */
   GEMINI_ASR_KEY?: string;
+  /** Stepfun TTS API key (set via `wrangler secret put STEPFUN_API_KEY`) */
+  STEPFUN_API_KEY?: string;
 }
 
 const corsHeaders: Record<string, string> = {
@@ -43,6 +46,9 @@ export default {
       }
       if (path === '/api/cosyvoice-tts') {
         return await handleCosyVoiceTTS(request, env);
+      }
+      if (path === '/api/stepfun-tts') {
+        return await handleStepfunTTS(request, env);
       }
       if (path === '/api/corpus') {
         return await handleCorpus(request);
